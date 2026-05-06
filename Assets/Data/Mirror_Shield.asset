@@ -18,3 +18,4 @@ MonoBehaviour:
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
   duration: 1
   effectValue: 0
+  requiresTarget: 0

@@ -59,7 +59,6 @@ public class HandManager : MonoBehaviour
             }
         }
     }
-
     public void RefillHand()
     {
         GameManager gm = Object.FindFirstObjectByType<GameManager>();

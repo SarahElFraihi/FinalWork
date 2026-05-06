@@ -61,10 +61,22 @@ public class CardDisplay : MonoBehaviour
     {
         HandManager hm = Object.FindFirstObjectByType<HandManager>();
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
+        TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
+
         if (gm != null && !gm.isResolutionPhase)
         {
             if (hm != null) hm.HighlightSelectedCard(this);
             gm.SelectCard(cardData);
+
+            // Si la carte a besoin d'une cible, on lance le ciblage !
+            if (cardData.requiresTarget && tm != null)
+            {
+                tm.StartTargeting();
+            }
+            else if (tm != null)
+            {
+                tm.ResetArrow(); // Cache la flèche si la carte n'en a pas besoin
+            }
         }
     }
 }

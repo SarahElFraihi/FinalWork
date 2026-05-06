@@ -17,7 +17,7 @@ public class CardData : ScriptableObject
     public int effectValue; 
 
     [Header("Targeting")]
-    public bool needsTarget;
+    public bool requiresTarget;
 
     private void OnValidate()
     {

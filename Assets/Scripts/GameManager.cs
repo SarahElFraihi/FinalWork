@@ -95,6 +95,16 @@ public class GameManager : MonoBehaviour
 
     void ResolveTurn()
     {
+
+        TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
+        if (tm != null) tm.ResetArrow();
+
+        if (selectedCard == null)
+        {
+            HandManager hm = Object.FindFirstObjectByType<HandManager>();
+            if (hm != null) hm.GetRandomCardFromHand().SelectThisCard();
+        }
+        
         if (selectedCard == null)
         {
             HandManager hm = Object.FindFirstObjectByType<HandManager>();
