@@ -19,3 +19,4 @@ MonoBehaviour:
   duration: 1
   effectValue: 0
   requiresTarget: 0
+  targetMode: 5

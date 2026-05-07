@@ -1603,7 +1603,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73f66907b6f42454199a0c4ea1bde4be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerName: Bot_Eye
+  playerName: Bot_Eye1
   isBot: 1
   maxHealth: 100
   currentHealth: 100
@@ -3350,8 +3350,8 @@ MonoBehaviour:
   maxHealth: 100
   currentHealth: 100
   leftNeighbor: {fileID: 1770890859}
-  rightNeighbor: {fileID: 310591287}
-  oppositePlayer: {fileID: 730438039}
+  rightNeighbor: {fileID: 730438039}
+  oppositePlayer: {fileID: 310591287}
   isShielded: 0
   isMirrorShielded: 0
 --- !u!4 &845213507 stripped
@@ -6554,7 +6554,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73f66907b6f42454199a0c4ea1bde4be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerName: Bot_Ghost
+  playerName: Bot_Ghost0
   isBot: 1
   maxHealth: 100
   currentHealth: 100
