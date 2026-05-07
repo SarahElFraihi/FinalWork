@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.UI; // Obligatoire pour gérer la barre de vie
 
 public class PlayerEntity : MonoBehaviour
 {
@@ -15,47 +14,31 @@ public class PlayerEntity : MonoBehaviour
     public bool isShielded = false;
     public bool isMirrorShielded = false;
 
-    [Header("Interface Visuelle")]
-    public Image healthBar; // Glisse l'image de la barre de vie ici
-
+    // Suppression de l'UpdateUI et de la healthBar pour garder la vie secrète
+    
     void Start()
     {
         currentHealth = maxHealth;
-        UpdateUI();
     }
 
     public void TakeDamage(int amount)
     {
-        // Logique de bouclier
-        if (amount > 0) // Si c'est une attaque
+        // Logique de bouclier (Shield)
+        if (amount < 0 && isShielded) // Si c'est une attaque (valeur négative)
         {
-            if (isShielded)
-            {
-                isShielded = false;
-                Debug.Log(playerName + " a bloqué l'attaque avec son bouclier !");
-                return;
-            }
+            isShielded = false;
+            Debug.Log(playerName + " a bloqué avec son bouclier !");
+            return;
         }
 
         // Application des dégâts ou soins
-        currentHealth -= amount; 
+        currentHealth += amount; 
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
-        UpdateUI();
-        
         if (currentHealth <= 0)
         {
             Debug.Log(playerName + " est KO !");
-        }
-    }
-
-    // Voici la méthode qui manquait !
-    public void UpdateUI()
-    {
-        if (healthBar != null)
-        {
-            // Calcul du ratio pour le fillAmount (entre 0 et 1)
-            healthBar.fillAmount = (float)currentHealth / maxHealth;
+            // Ici tu pourrais désactiver le fantôme ou lancer une animation de disparition
         }
     }
 }

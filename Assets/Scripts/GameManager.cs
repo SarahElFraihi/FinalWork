@@ -29,11 +29,24 @@ public class GameManager : MonoBehaviour
     public bool isMirrorShielded = false;
 
     [Header("History")]
-    public CardData lastPlayedCard; // Stocke la carte du tour précédent
+    public CardData lastPlayedCard;
 
     [Header("Selections")]
     public CardData selectedCard; 
-    public List<CardData> botSelections = new List<CardData>(); 
+    // On remplace la liste de décisions par une liste d'actions globale
+    public List<TurnAction> allActionsThisTurn = new List<TurnAction>();
+
+    [Header("Entities")]
+    public PlayerEntity playerEntity; 
+    public List<PlayerEntity> botEntities;
+    
+    [System.Serializable]
+    public class TurnAction
+    {
+        public PlayerEntity performer; // Celui qui joue
+        public CardData card;          // La carte jouée
+        public PlayerEntity target;    // La cible
+    }
 
     void Start()
     {
@@ -65,6 +78,10 @@ public class GameManager : MonoBehaviour
 
     public void StartTimer()
     {
+        // --- ÉTAPE 1 : RÉINITIALISER LA FLÈCHE (SÉCURITÉ) ---
+        TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
+        if (tm != null) tm.ResetArrow();
+
         // SAUVEGARDE DE L'HISTORIQUE
         if (selectedCard != null) 
         {
@@ -84,6 +101,7 @@ public class GameManager : MonoBehaviour
 
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
 
+        // RÉINITIALISATION VISUELLE DES CARTES
         HandManager hm = Object.FindFirstObjectByType<HandManager>();
         if (hm != null) hm.ResetAllCardsVisuals(); 
     }
@@ -99,31 +117,63 @@ public class GameManager : MonoBehaviour
         TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
         if (tm != null) tm.ResetArrow();
 
+    // --- SÉCURITÉ : CHOIX ALÉATOIRE SI LE JOUEUR N'A RIEN CHOISI ---
         if (selectedCard == null)
         {
             HandManager hm = Object.FindFirstObjectByType<HandManager>();
-            if (hm != null) hm.GetRandomCardFromHand().SelectThisCard();
-        }
-        
-        if (selectedCard == null)
-        {
-            HandManager hm = Object.FindFirstObjectByType<HandManager>();
-            if (hm != null) hm.GetRandomCardFromHand().SelectThisCard();
-        }
-
-        isResolutionPhase = true; 
-
-        botSelections.Clear();
-        HandManager hmRef = Object.FindFirstObjectByType<HandManager>();
-        if (hmRef != null)
-        {
-            for (int i = 0; i < 3; i++)
+            if (hm != null)
             {
-                int randomIndex = Random.Range(0, hmRef.allCardsInGame.Count);
-                botSelections.Add(hmRef.allCardsInGame[randomIndex]);
+                // On récupère une carte au hasard dans la main et on l'assigne
+                selectedCard = hm.GetRandomCardFromHand().cardData;
+                Debug.Log("Temps écoulé ! Sélection auto : " + selectedCard.cardName);
             }
         }
+        // --------------------------------------------------------------
 
+        // ... reset flèche etc ...
+        allActionsThisTurn.Clear();
+
+        // 1. ACTION DU JOUEUR
+        TurnAction playerAct = new TurnAction();
+        playerAct.performer = playerEntity;
+        playerAct.card = selectedCard;
+        
+        // On ne cherche une cible que si c'est nécessaire
+        if (selectedCard != null && selectedCard.requiresTarget && tm != null)
+            playerAct.target = botEntities[tm.currentTargetIndex];
+        else
+            playerAct.target = playerEntity; // Cible soi-même par défaut (ex: Shield)
+        
+        allActionsThisTurn.Add(playerAct);
+
+        // 2. ACTIONS DES BOTS
+        List<PlayerEntity> allParticipants = new List<PlayerEntity> { playerEntity };
+        allParticipants.AddRange(botEntities);
+
+        foreach (PlayerEntity bot in botEntities)
+        {
+            BotBrain brain = bot.GetComponent<BotBrain>();
+            if (brain != null)
+            {
+                TurnAction botAct = new TurnAction();
+                botAct.performer = bot;
+                botAct.card = brain.ChooseCard();
+                
+                // CORRECTION : On ne calcule une cible que si la carte le demande
+                if (botAct.card != null && botAct.card.requiresTarget)
+                {
+                    int myIdx = allParticipants.IndexOf(bot);
+                    botAct.target = allParticipants[brain.ChooseTargetIndex(myIdx, allParticipants.Count)];
+                }
+                else
+                {
+                    botAct.target = bot; // Pour les cartes de règles ou bonus personnels
+                }
+
+                allActionsThisTurn.Add(botAct);
+                brain.DiscardAndReplace(botAct.card);
+            }
+        }
         ProcessAllCards();
     }
 
@@ -132,24 +182,32 @@ public class GameManager : MonoBehaviour
         if (resolutionPanel != null) resolutionPanel.SetActive(true);
         string finalResults = "<b>ROUND RESULTS</b>\n\n";
 
+        // 1. On crée la liste de toutes les cartes jouées ce tour-ci
         List<CardData> allPlayedCards = new List<CardData>();
-        if (selectedCard != null) allPlayedCards.Add(selectedCard);
-        allPlayedCards.AddRange(botSelections);
+        
+        // On parcourt allActionsThisTurn qui contient maintenant les actions du joueur ET des bots
+        foreach (TurnAction action in allActionsThisTurn)
+        {
+            if (action.card != null) 
+                allPlayedCards.Add(action.card);
+        }
 
+        // 2. Tri des cartes par type pour la résolution (ne change pas)
         List<CardData> ruleCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Rule);
         List<CardData> actionCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Action);
         List<CardData> specialCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Special);
 
+        // 3. Ordre de résolution selon les règles actives
         if (rule_GravityFlip)
         {
             finalResults += ExecuteSpecialCards(specialCards);
-            finalResults += ExecuteActionCards(actionCards);
+            finalResults += ExecuteActionCards(allActionsThisTurn);
             finalResults += ExecuteRuleCards(ruleCards);
         }
         else
         {
             finalResults += ExecuteRuleCards(ruleCards);
-            finalResults += ExecuteActionCards(actionCards);
+            finalResults += ExecuteActionCards(allActionsThisTurn);
             finalResults += ExecuteSpecialCards(specialCards);
         }
 
@@ -179,53 +237,27 @@ public class GameManager : MonoBehaviour
         return log;
     }
 
-    string ExecuteActionCards(List<CardData> cards)
+    string ExecuteActionCards(List<TurnAction> actions)
     {
         string log = "";
-        foreach (CardData card in cards)
+        foreach (TurnAction act in actions)
         {
-            string name = card.cardName.Trim();
+            // --- FIX : On ignore les cartes qui ne sont pas de type ACTION ---
+            if (act.card == null || act.card.type != CardData.CardType.Action) continue;
+
+            string name = act.card.cardName.Trim();
             
-            // LOGIQUE DUPLICATE[cite: 15]
-            if (name == "Duplicate")
-            {
-                if (lastPlayedCard != null)
-                {
-                    log += $"<color=#FF00FF>DUPLICATE:</color> Copying {lastPlayedCard.cardName}!\n";
-                    ApplyCardValue(lastPlayedCard.effectValue);
-                }
-                else
-                {
-                    log += "<i>(Duplicate failed: no history)</i>\n";
-                }
-            }
-            else if (name == "Shield") isShielded = true;
-            else if (name == "Mirror Shield") isMirrorShielded = true;
+            if (name == "Shield") act.target.isShielded = true;
             else 
             {
-                int hpChange = card.effectValue; 
-
-                if (rule_HealingStrikes && hpChange < 0) hpChange = -hpChange;
-
-                if (hpChange < 0) 
-                {
-                    if (isShielded) 
-                    {
-                        hpChange = 0; 
-                        isShielded = false; 
-                        log += "<i>(Attack Blocked by Shield!)</i> ";
-                    }
-                    else if (isMirrorShielded)
-                    {
-                        hpChange = 0; 
-                        isMirrorShielded = false; 
-                        log += "<i>(Attack Reflected!)</i> ";
-                    }
-                }
-
-                ApplyCardValue(hpChange);
+                ApplyCardValue(act.card.effectValue, act.target);
             }
-            log += $"<color=#E61A1A>ACTION:</color> {name}\n";
+            
+            // Affichage intelligent du log
+            if (act.card.requiresTarget)
+                log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name} on {act.target.playerName}\n";
+            else
+                log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name}\n";
         }
         return log;
     }
@@ -247,12 +279,20 @@ public class GameManager : MonoBehaviour
         return log;
     }
 
-    void ApplyCardValue(int value)
+    void ApplyCardValue(int value, PlayerEntity target)
     {
-        if (value == 0) return; 
-        currentHealth += value;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-        if (healthLiquidImage != null) healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
+        if (value == 0 || target == null) return; 
+        
+        // On appelle TakeDamage sur la cible (Bot ou Joueur)
+        target.TakeDamage(value); 
+
+        // SI LA CIBLE EST LE JOUEUR : on met aussi à jour les variables de l'UI
+        if (!target.isBot)
+        {
+            currentHealth = target.currentHealth;
+            if (healthLiquidImage != null) 
+                healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
+        }
     }
 
     public void SelectCard(CardData data)

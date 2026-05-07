@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class UltraSmoothAvatar : MonoBehaviour
 {
+    [Header("Référence du Modèle")]
+    public Transform modelTransform; // Glisse ton fantôme ici dans l'Inspector
+
     private float floatSpeed;
     private float squashSpeed;
     private float height;
@@ -10,35 +13,41 @@ public class UltraSmoothAvatar : MonoBehaviour
     private Vector3 startScale;
 
     [Header("Réglages Invisibles")]
-    // On descend à 0.005 pour que l'étirement soit à peine perceptible
     public float squashAmount = 0.005f; 
 
     void Start()
     {
-        startPos = transform.position;
-        startScale = transform.localScale;
+        if (modelTransform == null)
+        {
+            Debug.LogError("Oulà ! Tu as oublié de glisser le modèle 3D dans le script sur l'objet Effects.");
+            return;
+        }
 
-        // On sépare les vitesses pour que le mouvement soit moins prévisible
-        floatSpeed = Random.Range(0.5f, 1.0f);   // Flottement très lent
-        squashSpeed = Random.Range(1.2f, 1.8f);  // Respiration un peu plus rapide
-        height = Random.Range(0.005f, 0.015f);  // Hauteur divisée par 2
-        offset = Random.Range(0f, 500f);        // Décalage massif
+        // On enregistre les données de départ du MODÈLE, pas de l'objet Effects
+        startPos = modelTransform.localPosition;
+        startScale = modelTransform.localScale;
+
+        floatSpeed = Random.Range(0.5f, 1.0f);
+        squashSpeed = Random.Range(1.2f, 1.8f);
+        height = Random.Range(0.005f, 0.015f);
+        offset = Random.Range(0f, 500f);
     }
 
     void Update()
     {
-        // 1. Flottement vertical ultra-calme
-        float floatSin = Mathf.Sin((Time.time + offset) * floatSpeed);
-        transform.position = startPos + new Vector3(0, floatSin * height, 0);
+        if (modelTransform == null) return;
 
-        // 2. Respiration (Squash) désynchronisée
-        // En utilisant un multiplicateur différent, le perso ne s'étire pas pile quand il est en haut
+        // 1. Flottement vertical appliqué au modèle
+        float floatSin = Mathf.Sin((Time.time + offset) * floatSpeed);
+        modelTransform.localPosition = startPos + new Vector3(0, floatSin * height, 0);
+
+        // 2. Respiration (Squash) appliquée au modèle
         float squashSin = Mathf.Sin((Time.time + offset) * squashSpeed);
         
         float stretchY = 1f + (squashSin * squashAmount);
         float squashXZ = 1f - (squashSin * squashAmount * 0.5f);
 
-        transform.localScale = new Vector3(
+        modelTransform.localScale = new Vector3(
             startScale.x * squashXZ,
             startScale.y * stretchY,
             startScale.z * squashXZ
