@@ -13,9 +13,11 @@ MonoBehaviour:
   m_Name: Mooch
   m_EditorClassIdentifier: 
   cardName: Mooch
-  description: Steal one random card from an opponent's hand.
+  description: Steal one random card from an opponent's hand and deal small amount
+    of damage.
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
   duration: 0
   effectValue: -2
   requiresTarget: 1
+  targetMode: 1

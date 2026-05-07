@@ -10,6 +10,11 @@ public class PlayerEntity : MonoBehaviour
     public int maxHealth = 100;
     public int currentHealth = 100;
 
+    [Header("Position à Table")]
+    public PlayerEntity leftNeighbor;
+    public PlayerEntity rightNeighbor;
+    public PlayerEntity oppositePlayer;
+
     [Header("États")]
     public bool isShielded = false;
     public bool isMirrorShielded = false;

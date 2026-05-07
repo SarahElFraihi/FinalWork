@@ -19,8 +19,14 @@ public class CardData : ScriptableObject
     [Header("Targeting")]
     public bool requiresTarget;
 
+    public enum TargetMode { None, Chosen, Left, Right, Opposite, Self, Everyone }    
+    [Header("Ciblage")]
+    public TargetMode targetMode;
+
     private void OnValidate()
     {
+        requiresTarget = (targetMode == TargetMode.Chosen);
+
         switch (type)
         {
             case CardType.Action:

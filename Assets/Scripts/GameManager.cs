@@ -113,67 +113,78 @@ public class GameManager : MonoBehaviour
 
     void ResolveTurn()
     {
-
         TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
         if (tm != null) tm.ResetArrow();
 
-    // --- SÉCURITÉ : CHOIX ALÉATOIRE SI LE JOUEUR N'A RIEN CHOISI ---
+        // 1. SÉCURITÉ : CHOIX ALÉATOIRE JOUEUR
         if (selectedCard == null)
         {
             HandManager hm = Object.FindFirstObjectByType<HandManager>();
-            if (hm != null)
-            {
-                // On récupère une carte au hasard dans la main et on l'assigne
-                selectedCard = hm.GetRandomCardFromHand().cardData;
-                Debug.Log("Temps écoulé ! Sélection auto : " + selectedCard.cardName);
-            }
+            if (hm != null) selectedCard = hm.GetRandomCardFromHand().cardData;
         }
-        // --------------------------------------------------------------
 
-        // ... reset flèche etc ...
         allActionsThisTurn.Clear();
 
-        // 1. ACTION DU JOUEUR
-        TurnAction playerAct = new TurnAction();
-        playerAct.performer = playerEntity;
-        playerAct.card = selectedCard;
-        
-        // On ne cherche une cible que si c'est nécessaire
-        if (selectedCard != null && selectedCard.requiresTarget && tm != null)
-            playerAct.target = botEntities[tm.currentTargetIndex];
-        else
-            playerAct.target = playerEntity; // Cible soi-même par défaut (ex: Shield)
-        
-        allActionsThisTurn.Add(playerAct);
-
-        // 2. ACTIONS DES BOTS
+        // 2. ON PRÉPARE LA LISTE DES PARTICIPANTS
         List<PlayerEntity> allParticipants = new List<PlayerEntity> { playerEntity };
         allParticipants.AddRange(botEntities);
 
-        foreach (PlayerEntity bot in botEntities)
+        // 3. UNE SEULE BOUCLE POUR TOUT LE MONDE
+        foreach (PlayerEntity performer in allParticipants)
         {
-            BotBrain brain = bot.GetComponent<BotBrain>();
-            if (brain != null)
-            {
-                TurnAction botAct = new TurnAction();
-                botAct.performer = bot;
-                botAct.card = brain.ChooseCard();
-                
-                // CORRECTION : On ne calcule une cible que si la carte le demande
-                if (botAct.card != null && botAct.card.requiresTarget)
-                {
-                    int myIdx = allParticipants.IndexOf(bot);
-                    botAct.target = allParticipants[brain.ChooseTargetIndex(myIdx, allParticipants.Count)];
-                }
-                else
-                {
-                    botAct.target = bot; // Pour les cartes de règles ou bonus personnels
-                }
+            TurnAction action = new TurnAction();
+            action.performer = performer;
 
-                allActionsThisTurn.Add(botAct);
-                brain.DiscardAndReplace(botAct.card);
+            // On récupère la carte (celle choisie pour toi, celle du cerveau pour le bot)
+            if (performer.isBot)
+                action.card = performer.GetComponent<BotBrain>().ChooseCard();
+            else
+                action.card = selectedCard;
+
+            if (action.card == null) continue;
+
+            // 4. CALCUL DE LA CIBLE SELON LE MODE
+            switch (action.card.targetMode)
+            {
+                case CardData.TargetMode.None:
+                case CardData.TargetMode.Everyone:
+                    action.target = null; // Pas de cible unique nécessaire
+                    break;
+
+                case CardData.TargetMode.Self:
+                    action.target = performer;
+                    break;
+
+                case CardData.TargetMode.Chosen:
+                    if (!performer.isBot && tm != null)
+                        action.target = botEntities[tm.currentTargetIndex];
+                    else if (performer.isBot)
+                    {
+                        int myIdx = allParticipants.IndexOf(performer);
+                        int targetIdx = performer.GetComponent<BotBrain>().ChooseTargetIndex(myIdx, allParticipants.Count);
+                        action.target = allParticipants[targetIdx];
+                    }
+                    break;
+
+                case CardData.TargetMode.Left:
+                    action.target = performer.leftNeighbor;
+                    break;
+
+                case CardData.TargetMode.Right:
+                    action.target = performer.rightNeighbor;
+                    break;
+
+                case CardData.TargetMode.Opposite:
+                    action.target = performer.oppositePlayer;
+                    break;
             }
+
+            allActionsThisTurn.Add(action);
+
+            // Si c'est un bot, il jette sa carte pour en piocher une nouvelle
+            if (performer.isBot) performer.GetComponent<BotBrain>().DiscardAndReplace(action.card);
         }
+
         ProcessAllCards();
     }
 
@@ -182,32 +193,33 @@ public class GameManager : MonoBehaviour
         if (resolutionPanel != null) resolutionPanel.SetActive(true);
         string finalResults = "<b>ROUND RESULTS</b>\n\n";
 
-        // 1. On crée la liste de toutes les cartes jouées ce tour-ci
+        // 1. On crée la liste de toutes les cartes jouées
         List<CardData> allPlayedCards = new List<CardData>();
         
-        // On parcourt allActionsThisTurn qui contient maintenant les actions du joueur ET des bots
+        // CORRECTIF : On utilise UNIQUEMENT allActionsThisTurn qui contient déjà 
+        // le joueur ET les bots sans exception.
         foreach (TurnAction action in allActionsThisTurn)
         {
             if (action.card != null) 
                 allPlayedCards.Add(action.card);
         }
 
-        // 2. Tri des cartes par type pour la résolution (ne change pas)
+        // 2. Tri des cartes par type
         List<CardData> ruleCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Rule);
         List<CardData> actionCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Action);
         List<CardData> specialCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Special);
 
-        // 3. Ordre de résolution selon les règles actives
+        // 3. Exécution
         if (rule_GravityFlip)
         {
             finalResults += ExecuteSpecialCards(specialCards);
-            finalResults += ExecuteActionCards(allActionsThisTurn);
+            finalResults += ExecuteActionCards(allActionsThisTurn); // Utilise les actions complètes
             finalResults += ExecuteRuleCards(ruleCards);
         }
         else
         {
             finalResults += ExecuteRuleCards(ruleCards);
-            finalResults += ExecuteActionCards(allActionsThisTurn);
+            finalResults += ExecuteActionCards(allActionsThisTurn); // Utilise les actions complètes
             finalResults += ExecuteSpecialCards(specialCards);
         }
 
@@ -240,24 +252,42 @@ public class GameManager : MonoBehaviour
     string ExecuteActionCards(List<TurnAction> actions)
     {
         string log = "";
+        
+        // On prépare la liste de tous les participants pour les effets de zone
+        List<PlayerEntity> everyone = new List<PlayerEntity> { playerEntity };
+        everyone.AddRange(botEntities);
+
         foreach (TurnAction act in actions)
         {
-            // --- FIX : On ignore les cartes qui ne sont pas de type ACTION ---
+            // On ignore ce qui n'est pas une action
             if (act.card == null || act.card.type != CardData.CardType.Action) continue;
 
             string name = act.card.cardName.Trim();
-            
-            if (name == "Shield") act.target.isShielded = true;
-            else 
+
+            // 1. CAS : TOUT LE MONDE (AOE)
+            if (act.card.targetMode == CardData.TargetMode.Everyone)
             {
-                ApplyCardValue(act.card.effectValue, act.target);
+                foreach (PlayerEntity p in everyone)
+                {
+                    ApplyCardValue(act.card.effectValue, p);
+                }
+                log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name} on EVERYONE\n";
             }
-            
-            // Affichage intelligent du log
-            if (act.card.requiresTarget)
-                log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name} on {act.target.playerName}\n";
-            else
-                log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name}\n";
+            // 2. CAS : CIBLE UNIQUE (OU SOI-MÊME)
+            else if (act.target != null)
+            {
+                if (name == "Shield") act.target.isShielded = true;
+                else 
+                {
+                    ApplyCardValue(act.card.effectValue, act.target);
+                }
+                
+                // Log intelligent selon si la flèche était utilisée ou non
+                if (act.card.requiresTarget)
+                    log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name} on {act.target.playerName}\n";
+                else
+                    log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name}\n";
+            }
         }
         return log;
     }
