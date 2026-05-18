@@ -16,7 +16,8 @@ MonoBehaviour:
   description: Deals small damage to the player on your right.
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
-  duration: 0
-  effectValue: -5
+  effects:
+  - effectType: 0
+    value: 5
   requiresTarget: 0
   targetMode: 3

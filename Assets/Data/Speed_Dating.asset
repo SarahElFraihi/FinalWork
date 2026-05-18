@@ -16,5 +16,8 @@ MonoBehaviour:
   description: The timer is permanently reduced to 5 seconds.
   type: 1
   cardColor: {r: 1, g: 0.85, b: 0, a: 1}
-  duration: -1
-  effectValue: 0
+  effects:
+  - effectType: 15
+    value: 5
+  requiresTarget: 0
+  targetMode: 0

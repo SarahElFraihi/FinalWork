@@ -35,13 +35,13 @@ public class BotBrain : MonoBehaviour
         // --- LOGIQUE SELON LA PERSONNALITÉ ---
         if (personality == Personality.Aggressive)
         {
-            // Cherche la carte qui fait le plus de dégâts (effectValue le plus bas)
-            chosenCard = hand.Find(c => c.type == CardData.CardType.Action && c.effectValue < 0);
+            // Cherche si le premier effet est de type Damage
+            chosenCard = hand.Find(c => c.type == CardData.CardType.Action && c.effects.Count > 0 && c.effects[0].effectType == CardData.EffectType.Damage);
         }
         else if (personality == Personality.Defensive)
         {
-            // Cherche un bouclier ou du soin (effectValue positif)
-            chosenCard = hand.Find(c => c.cardName == "Shield" || (c.type == CardData.CardType.Action && c.effectValue > 0));
+            // Cherche un bouclier ou du soin
+            chosenCard = hand.Find(c => c.cardName == "Shield" || (c.effects.Count > 0 && c.effects[0].effectType == CardData.EffectType.Heal));
         }
 
         // Si pas de carte spécifique trouvée ou si Chaotic, on prend au hasard dans la main

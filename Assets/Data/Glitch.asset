@@ -16,4 +16,6 @@ MonoBehaviour:
   description: Instantly shuffle everyone's hands.
   type: 2
   cardColor: {r: 0.6, g: 0.1, b: 0.9, a: 1}
-  duration: 0
+  effects: []
+  requiresTarget: 0
+  targetMode: 0

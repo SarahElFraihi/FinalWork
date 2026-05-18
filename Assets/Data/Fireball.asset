@@ -16,7 +16,8 @@ MonoBehaviour:
   description: Deals direct damage to an opponent.
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
-  duration: 0
-  effectValue: -15
+  effects:
+  - effectType: 0
+    value: 15
   requiresTarget: 1
   targetMode: 1

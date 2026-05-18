@@ -16,7 +16,6 @@ MonoBehaviour:
   description: Reflect the next attack back to the sender.
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
-  duration: 1
-  effectValue: 0
+  effects: []
   requiresTarget: 0
   targetMode: 5

@@ -16,7 +16,8 @@ MonoBehaviour:
   description: Next attacks heal instead of dealing damage.
   type: 1
   cardColor: {r: 1, g: 0.85, b: 0, a: 1}
-  duration: 1
-  effectValue: 20
+  effects:
+  - effectType: 1
+    value: 0
   requiresTarget: 0
   targetMode: 0

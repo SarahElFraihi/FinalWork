@@ -10,6 +10,7 @@ public class GameManager : MonoBehaviour
     public Image healthLiquidImage;
     public GameObject resolutionPanel; 
     public TextMeshProUGUI resultsText; 
+    public TextMeshProUGUI goldText;
 
     [Header("Player Stats")]
     public int maxHealth = 100;
@@ -27,6 +28,10 @@ public class GameManager : MonoBehaviour
     public bool rule_HealingStrikes = false; 
     public bool isShielded = false;
     public bool isMirrorShielded = false;
+
+    [Header("Rule Engine")]
+    // Liste de tous les effets de règles actuellement en vigueur
+    public List<CardData.CardEffect> activeRules = new List<CardData.CardEffect>();
 
     [Header("History")]
     public CardData lastPlayedCard;
@@ -55,6 +60,7 @@ public class GameManager : MonoBehaviour
         healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
     }
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
+        UpdateGoldUI();
         StartTimer();
     }
 
@@ -78,22 +84,14 @@ public class GameManager : MonoBehaviour
 
     public void StartTimer()
     {
-        // --- ÉTAPE 1 : RÉINITIALISER LA FLÈCHE (SÉCURITÉ) ---
         TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
         if (tm != null) tm.ResetArrow();
 
-        // SAUVEGARDE DE L'HISTORIQUE
-        if (selectedCard != null) 
-        {
-            lastPlayedCard = selectedCard; 
-        }
+        if (selectedCard != null) lastPlayedCard = selectedCard; 
 
         timeLeft = nextRoundTimerDuration;
-        nextRoundTimerDuration = baseTimerDuration; 
-        
-        isShielded = false;
-        isMirrorShielded = false;
-        rule_HealingStrikes = false; 
+
+        // --- LOGIQUE DE PERSISTENCE ---
 
         timerRunning = true;
         isResolutionPhase = false; 
@@ -101,11 +99,11 @@ public class GameManager : MonoBehaviour
 
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
 
-        // RÉINITIALISATION VISUELLE DES CARTES
         HandManager hm = Object.FindFirstObjectByType<HandManager>();
         if (hm != null) hm.ResetAllCardsVisuals(); 
-    }
 
+        ApplyPassiveRules();
+    }
     void UpdateTimerUI()
     {
         timerText.text = Mathf.Ceil(timeLeft).ToString();
@@ -116,26 +114,23 @@ public class GameManager : MonoBehaviour
         TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
         if (tm != null) tm.ResetArrow();
 
-        // 1. SÉCURITÉ : CHOIX ALÉATOIRE JOUEUR
-        if (selectedCard == null)
-        {
-            HandManager hm = Object.FindFirstObjectByType<HandManager>();
-            if (hm != null) selectedCard = hm.GetRandomCardFromHand().cardData;
-        }
-
         allActionsThisTurn.Clear();
-
-        // 2. ON PRÉPARE LA LISTE DES PARTICIPANTS
         List<PlayerEntity> allParticipants = new List<PlayerEntity> { playerEntity };
         allParticipants.AddRange(botEntities);
 
-        // 3. UNE SEULE BOUCLE POUR TOUT LE MONDE
         foreach (PlayerEntity performer in allParticipants)
         {
+            // --- 1. LOI : FROZEN (GELÉ) ---
+            if (performer.isFrozen)
+            {
+                Debug.Log(performer.playerName + " is frozen and skips their turn!");
+                performer.isFrozen = false; // On le dégèle pour le tour suivant
+                continue; // On passe au joueur suivant sans ajouter d'action
+            }
+
             TurnAction action = new TurnAction();
             action.performer = performer;
 
-            // On récupère la carte (celle choisie pour toi, celle du cerveau pour le bot)
             if (performer.isBot)
                 action.card = performer.GetComponent<BotBrain>().ChooseCard();
             else
@@ -143,49 +138,109 @@ public class GameManager : MonoBehaviour
 
             if (action.card == null) continue;
 
-            // 4. CALCUL DE LA CIBLE SELON LE MODE
-            switch (action.card.targetMode)
+            // --- 2. LOI : SILENCED (SILENCE) ---
+            // Si le joueur est silencieux, il ne peut pas jouer de cartes Special ou Rule
+            if (performer.isSilenced && action.card.type != CardData.CardType.Action)
             {
-                case CardData.TargetMode.None:
-                case CardData.TargetMode.Everyone:
-                    action.target = null; // Pas de cible unique nécessaire
-                    break;
+                Debug.Log(performer.playerName + " is silenced and can't use Special/Rule cards!");
+                performer.isSilenced = false; 
+                continue;
+            }
 
-                case CardData.TargetMode.Self:
-                    action.target = performer;
-                    break;
+            // --- 3. LOI : CONFUSED (CONFUS) ---
+            // On change la cible pour une cible aléatoire
+            CardData.TargetMode effectiveTargetMode = action.card.targetMode;
+            if (performer.isConfused)
+            {
+                effectiveTargetMode = CardData.TargetMode.Chosen; // On force un choix aléatoire
+                performer.isConfused = false;
+            }
 
+            // --- CALCUL DE LA CIBLE ---
+            switch (effectiveTargetMode)
+            {
+                case CardData.TargetMode.Self: action.target = performer; break;
                 case CardData.TargetMode.Chosen:
+                    // --- 4. LOI : INVISIBLE ---
+                    // On s'assure que la cible n'est pas invisible (sauf si c'est un bot qui choisit mal volontairement)
                     if (!performer.isBot && tm != null)
                         action.target = botEntities[tm.currentTargetIndex];
-                    else if (performer.isBot)
+                    else
                     {
-                        int myIdx = allParticipants.IndexOf(performer);
-                        int targetIdx = performer.GetComponent<BotBrain>().ChooseTargetIndex(myIdx, allParticipants.Count);
-                        action.target = allParticipants[targetIdx];
+                        // Pour les bots, on cherche une cible qui n'est pas invisible
+                        List<PlayerEntity> potentialTargets = allParticipants.FindAll(p => p != performer && !p.isInvisible);
+                        if (potentialTargets.Count > 0)
+                            action.target = potentialTargets[Random.Range(0, potentialTargets.Count)];
+                        else
+                            action.target = allParticipants[Random.Range(0, allParticipants.Count)];
                     }
                     break;
-
-                case CardData.TargetMode.Left:
-                    action.target = performer.leftNeighbor;
-                    break;
-
-                case CardData.TargetMode.Right:
-                    action.target = performer.rightNeighbor;
-                    break;
-
-                case CardData.TargetMode.Opposite:
-                    action.target = performer.oppositePlayer;
-                    break;
+                // ... garde les autres cases (Left, Right, etc.) ...
             }
 
             allActionsThisTurn.Add(action);
-
-            // Si c'est un bot, il jette sa carte pour en piocher une nouvelle
             if (performer.isBot) performer.GetComponent<BotBrain>().DiscardAndReplace(action.card);
         }
 
         ProcessAllCards();
+    }
+
+    void ResolveEffect(CardData.CardEffect effect, PlayerEntity target, PlayerEntity performer)
+    {
+        if (target == null || performer == null) return;
+
+        switch (effect.effectType)
+        {
+            // --- Stats Numériques ---
+            case CardData.EffectType.Damage:
+                int dmg = (int)effect.value;
+                // LOGIQUE "HEALING STRIKES" : Si une règle de soin active existe, on soigne au lieu de blesser
+                if (activeRules.Exists(r => r.effectType == CardData.EffectType.Heal)) target.TakeDamage(dmg);
+                else target.TakeDamage(-dmg);
+                break;
+            case CardData.EffectType.Heal: target.TakeDamage((int)effect.value); break;
+            case CardData.EffectType.Gold: target.gold += (int)effect.value; break;
+            case CardData.EffectType.Karma: target.karma += (int)effect.value; break;
+            case CardData.EffectType.Luck: target.luck += (int)effect.value; break;
+            
+            // --- États & Bools (On les active simplement)
+            case CardData.EffectType.Frozen: target.isFrozen = true; break;
+            case CardData.EffectType.Burn: target.isOnFire = true; break;
+            case CardData.EffectType.Poison: target.isPoisoned = true; break;
+            case CardData.EffectType.Shield: target.isShielded = true; break;
+            case CardData.EffectType.Invisible: target.isInvisible = true; break;
+            case CardData.EffectType.Wanted: target.isWanted = true; break;
+            case CardData.EffectType.Silenced: target.isSilenced = true; break;
+            case CardData.EffectType.Linked: target.isLinked = true; break;
+
+            // --- Modificateurs de jeu ---
+            case CardData.EffectType.Thorns: target.thorns += (int)effect.value; break;
+            case CardData.EffectType.HandSize: target.handSize = (int)effect.value; break;
+            case CardData.EffectType.TimerMod: // Changement immédiat du timer
+                baseTimerDuration = effect.value;
+                nextRoundTimerDuration = effect.value;
+                break;
+            case CardData.EffectType.GravityFlip: rule_GravityFlip = !rule_GravityFlip; break;
+
+            // --- Actions Complexes ---
+            case CardData.EffectType.StealCard:
+                if (target.isBot) {
+                    BotBrain brain = target.GetComponent<BotBrain>();
+                    if (brain != null && brain.hand.Count > 0) brain.hand.RemoveAt(Random.Range(0, brain.hand.Count));
+                }
+                break;
+        }
+
+        if (performer == playerEntity) UpdateGoldUI();
+    }
+
+    public void UpdateGoldUI()
+    {
+        // On vérifie si tu as glissé un objet texte dans l'inspecteur
+        if (goldText != null && playerEntity != null)
+        {
+            goldText.text = playerEntity.gold.ToString();
+        }
     }
 
     void ProcessAllCards()
@@ -193,58 +248,39 @@ public class GameManager : MonoBehaviour
         if (resolutionPanel != null) resolutionPanel.SetActive(true);
         string finalResults = "<b>ROUND RESULTS</b>\n\n";
 
-        // 1. On crée la liste de toutes les cartes jouées
-        List<CardData> allPlayedCards = new List<CardData>();
-        
-        // CORRECTIF : On utilise UNIQUEMENT allActionsThisTurn qui contient déjà 
-        // le joueur ET les bots sans exception.
-        foreach (TurnAction action in allActionsThisTurn)
-        {
-            if (action.card != null) 
-                allPlayedCards.Add(action.card);
-        }
+        // Tri des actions par type de carte
+        List<TurnAction> ruleActions = allActionsThisTurn.FindAll(a => a.card.type == CardData.CardType.Rule);
+        List<TurnAction> actionActions = allActionsThisTurn.FindAll(a => a.card.type == CardData.CardType.Action);
+        List<TurnAction> specialActions = allActionsThisTurn.FindAll(a => a.card.type == CardData.CardType.Special);
 
-        // 2. Tri des cartes par type
-        List<CardData> ruleCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Rule);
-        List<CardData> actionCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Action);
-        List<CardData> specialCards = allPlayedCards.FindAll(c => c.type == CardData.CardType.Special);
-
-        // 3. Exécution
-        if (rule_GravityFlip)
-        {
-            finalResults += ExecuteSpecialCards(specialCards);
-            finalResults += ExecuteActionCards(allActionsThisTurn); // Utilise les actions complètes
-            finalResults += ExecuteRuleCards(ruleCards);
-        }
-        else
-        {
-            finalResults += ExecuteRuleCards(ruleCards);
-            finalResults += ExecuteActionCards(allActionsThisTurn); // Utilise les actions complètes
-            finalResults += ExecuteSpecialCards(specialCards);
+        // Ordre d'exécution respectant la stratégie de chaos
+        if (rule_GravityFlip) {
+            finalResults += ExecuteSpecialCards(specialActions);
+            finalResults += ExecuteActionCards(actionActions);
+            finalResults += ExecuteRuleCards(ruleActions);
+        } else {
+            finalResults += ExecuteRuleCards(ruleActions);
+            finalResults += ExecuteActionCards(actionActions);
+            finalResults += ExecuteSpecialCards(specialActions);
         }
 
         if (resultsText != null) resultsText.text = finalResults;
-        
-        HandManager hm = Object.FindFirstObjectByType<HandManager>();
-        if (hm != null) hm.RefillHand();
+        if (Object.FindFirstObjectByType<HandManager>() != null) Object.FindFirstObjectByType<HandManager>().RefillHand();
     }
 
-    string ExecuteRuleCards(List<CardData> cards)
+    string ExecuteRuleCards(List<TurnAction> actions)
     {
         string log = "";
-        foreach (CardData card in cards)
+        foreach (TurnAction act in actions)
         {
-            string name = card.cardName.Trim();
-            if (name == "Speed Dating") 
+            foreach (var effect in act.card.effects)
             {
-                baseTimerDuration = 5f; 
-                nextRoundTimerDuration = 5f;
+                // On applique l'effet immédiatement (ex: Timer) ET on l'enregistre en règle passive
+                ResolveEffect(effect, playerEntity, act.performer); 
+                activeRules.RemoveAll(r => r.effectType == effect.effectType);
+                activeRules.Add(effect);
             }
-            else if (name == "Turbo Mode") nextRoundTimerDuration = 5f;
-            else if (name == "Gravity Flip") rule_GravityFlip = !rule_GravityFlip; 
-            else if (name == "Healing Strikes") rule_HealingStrikes = true;
-            
-            log += $"<color=#FFD700>RULE:</color> {name}\n";
+            log += $"<color=#FFD700>RULE:</color> {act.card.cardName} is active!\n";
         }
         return log;
     }
@@ -252,61 +288,42 @@ public class GameManager : MonoBehaviour
     string ExecuteActionCards(List<TurnAction> actions)
     {
         string log = "";
-        
-        // On prépare la liste de tous les participants pour les effets de zone
-        List<PlayerEntity> everyone = new List<PlayerEntity> { playerEntity };
-        everyone.AddRange(botEntities);
-
         foreach (TurnAction act in actions)
         {
-            // On ignore ce qui n'est pas une action
-            if (act.card == null || act.card.type != CardData.CardType.Action) continue;
-
-            string name = act.card.cardName.Trim();
-
-            // 1. CAS : TOUT LE MONDE (AOE)
-            if (act.card.targetMode == CardData.TargetMode.Everyone)
-            {
-                foreach (PlayerEntity p in everyone)
-                {
-                    ApplyCardValue(act.card.effectValue, p);
-                }
-                log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name} on EVERYONE\n";
-            }
-            // 2. CAS : CIBLE UNIQUE (OU SOI-MÊME)
-            else if (act.target != null)
-            {
-                if (name == "Shield") act.target.isShielded = true;
-                else 
-                {
-                    ApplyCardValue(act.card.effectValue, act.target);
-                }
-                
-                // Log intelligent selon si la flèche était utilisée ou non
-                if (act.card.requiresTarget)
-                    log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name} on {act.target.playerName}\n";
-                else
-                    log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} plays {name}\n";
-            }
+            ApplyEffectsWithTargeting(act);
+            log += $"<color=#E61A1A>ACTION:</color> {act.performer.playerName} played {act.card.cardName}\n";
         }
         return log;
     }
 
-    string ExecuteSpecialCards(List<CardData> cards)
+    string ExecuteSpecialCards(List<TurnAction> actions)
     {
         string log = "";
-        foreach (CardData card in cards)
+        foreach (TurnAction act in actions)
         {
-            string name = card.cardName.Trim();
-            if (name == "Glitch")
-            {
-                HandManager hm = Object.FindFirstObjectByType<HandManager>();
-                if (hm != null) hm.GenerateRandomHand(); 
-            }
-            
-            log += $"<color=#991AE6>SPECIAL:</color> {name}\n";
+            // Glitch spécifique
+            if (act.card.cardName == "Glitch" && Object.FindFirstObjectByType<HandManager>() != null) 
+                Object.FindFirstObjectByType<HandManager>().GenerateRandomHand();
+
+            ApplyEffectsWithTargeting(act);
+            log += $"<color=#991AE6>SPECIAL:</color> {act.card.cardName}\n";
         }
         return log;
+    }
+
+    // Fonction utilitaire pour gérer le ciblage (Everyone vs Single)
+    void ApplyEffectsWithTargeting(TurnAction act)
+    {
+        List<PlayerEntity> everyone = new List<PlayerEntity> { playerEntity };
+        everyone.AddRange(botEntities);
+
+        foreach (var effect in act.card.effects)
+        {
+            if (act.card.targetMode == CardData.TargetMode.Everyone)
+                foreach (PlayerEntity p in everyone) ResolveEffect(effect, p, act.performer);
+            else
+                ResolveEffect(effect, act.target, act.performer);
+        }
     }
 
     void ApplyCardValue(int value, PlayerEntity target)
@@ -329,4 +346,25 @@ public class GameManager : MonoBehaviour
     {
         if (!isResolutionPhase) selectedCard = data;
     }
+
+    void ApplyPassiveRules()
+    {
+        List<PlayerEntity> everyone = new List<PlayerEntity> { playerEntity };
+        everyone.AddRange(botEntities);
+
+        foreach (PlayerEntity p in everyone)
+        {
+            if (p.isPoisoned) p.TakeDamage(-5);
+            if (p.isOnFire) p.TakeDamage(-10);
+
+            // MISE À JOUR VISUELLE : Si c'est TOI qui prends des dégâts passifs
+            if (p == playerEntity && healthLiquidImage != null)
+            {
+                currentHealth = p.currentHealth;
+                healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
+            }
+        }
+        UpdateGoldUI();
+    }
+
 }

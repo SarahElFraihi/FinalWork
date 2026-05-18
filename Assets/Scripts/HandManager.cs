@@ -62,14 +62,24 @@ public class HandManager : MonoBehaviour
     public void RefillHand()
     {
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
+        AICardGenerator aiGen = Object.FindFirstObjectByType<AICardGenerator>();
 
         foreach (CardDisplay slot in cardSlots)
         {
-            // On ne remplace que la carte qui a été jouée
             if (gm != null && slot.cardData == gm.selectedCard)
             {
-                int randomIndex = Random.Range(0, allCardsInGame.Count);
-                slot.LoadCard(allCardsInGame[randomIndex]);
+                // 50% de chance de demander une carte à l'IA en temps réel
+                if (aiGen != null && !aiGen.useSimulator && Random.value > 0.5f)
+                {
+                    aiGen.RequestNewCard((generatedCard) => {
+                        slot.LoadCard(generatedCard);
+                    });
+                }
+                else // Sinon, pioche classique instantanée
+                {
+                    int randomIndex = Random.Range(0, allCardsInGame.Count);
+                    slot.LoadCard(allCardsInGame[randomIndex]);
+                }
             }
         }
     }
