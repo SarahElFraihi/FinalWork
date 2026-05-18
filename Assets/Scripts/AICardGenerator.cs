@@ -9,7 +9,7 @@ public class AICardGenerator : MonoBehaviour
     public bool useSimulator = true;
 
     [Header("API Configuration")]
-    public string apiKey = "AIzaSyBHaLroSpCpaa2TpYA4GUX7QOryhlt40kw";
+    public string apiKey = "YOUR_API_KEY_HERE";
     private string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=";    
 
     public void RequestNewCard(System.Action<CardData> callback)
