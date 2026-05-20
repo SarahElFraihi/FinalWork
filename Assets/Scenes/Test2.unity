@@ -1643,6 +1643,8 @@ GameObject:
   - component: {fileID: 310591286}
   - component: {fileID: 310591287}
   - component: {fileID: 310591288}
+  - component: {fileID: 310591290}
+  - component: {fileID: 310591289}
   m_Layer: 0
   m_Name: Bot_Eye1
   m_TagString: Untagged
@@ -1704,6 +1706,9 @@ MonoBehaviour:
   leftNeighbor: {fileID: 730438039}
   rightNeighbor: {fileID: 1770890859}
   oppositePlayer: {fileID: 835083793}
+  fullHealthColor: {r: 0.69803923, g: 0.32156864, b: 0.8, a: 1}
+  lowHealthColor: {r: 0.18039216, g: 0.039215688, b: 0.25882354, a: 1}
+  myHealthLiquidImage: {fileID: 0}
 --- !u!114 &310591288
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1719,6 +1724,42 @@ MonoBehaviour:
   personality: 1
   selfEntity: {fileID: 310591287}
   hand: []
+--- !u!136 &310591289
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 310591285}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 1.5
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.5, z: 0}
+--- !u!114 &310591290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 310591285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64b3110e69fe79b4e895147014c6ba1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  associatedEntity: {fileID: 310591287}
 --- !u!1 &320727824
 GameObject:
   m_ObjectHideFlags: 0
@@ -3217,6 +3258,8 @@ GameObject:
   - component: {fileID: 730438038}
   - component: {fileID: 730438039}
   - component: {fileID: 730438040}
+  - component: {fileID: 730438042}
+  - component: {fileID: 730438041}
   m_Layer: 0
   m_Name: Bot_Eye2
   m_TagString: Untagged
@@ -3278,6 +3321,9 @@ MonoBehaviour:
   leftNeighbor: {fileID: 835083793}
   rightNeighbor: {fileID: 310591287}
   oppositePlayer: {fileID: 1770890859}
+  fullHealthColor: {r: 0.69803923, g: 0.32156864, b: 0.8, a: 1}
+  lowHealthColor: {r: 0.18039216, g: 0.039215688, b: 0.25882354, a: 1}
+  myHealthLiquidImage: {fileID: 0}
 --- !u!114 &730438040
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3293,6 +3339,42 @@ MonoBehaviour:
   personality: 2
   selfEntity: {fileID: 730438039}
   hand: []
+--- !u!136 &730438041
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 730438037}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 1.5
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.5, z: 0}
+--- !u!114 &730438042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 730438037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64b3110e69fe79b4e895147014c6ba1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  associatedEntity: {fileID: 730438039}
 --- !u!1 &778584090
 GameObject:
   m_ObjectHideFlags: 0
@@ -3581,6 +3663,9 @@ MonoBehaviour:
   leftNeighbor: {fileID: 1770890859}
   rightNeighbor: {fileID: 730438039}
   oppositePlayer: {fileID: 310591287}
+  fullHealthColor: {r: 0.69803923, g: 0.32156864, b: 0.8, a: 1}
+  lowHealthColor: {r: 0.18039216, g: 0.039215688, b: 0.25882354, a: 1}
+  myHealthLiquidImage: {fileID: 174775489}
 --- !u!4 &845213507 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 009f66bc444b8ad44bf0df2c01396c89,
@@ -6543,7 +6628,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   timerText: {fileID: 892524912}
-  healthLiquidImage: {fileID: 174775489}
   resolutionPanel: {fileID: 1391502658}
   resultsText: {fileID: 488313834}
   goldText: {fileID: 1814969346}
@@ -6567,6 +6651,7 @@ MonoBehaviour:
   - {fileID: 1770890859}
   - {fileID: 310591287}
   - {fileID: 730438039}
+  selectedTarget: {fileID: 0}
 --- !u!4 &1718063284
 Transform:
   m_ObjectHideFlags: 0
@@ -6595,7 +6680,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useSimulator: 0
-  apiKey: AIzaSyBHaLroSpCpaa2TpYA4GUX7QOryhlt40kw
+  maxPoolSize: 10
 --- !u!1 &1718202216
 GameObject:
   m_ObjectHideFlags: 0
@@ -6762,6 +6847,8 @@ GameObject:
   - component: {fileID: 1770890858}
   - component: {fileID: 1770890859}
   - component: {fileID: 1770890860}
+  - component: {fileID: 1770890862}
+  - component: {fileID: 1770890861}
   m_Layer: 0
   m_Name: Bot_Ghost0
   m_TagString: Untagged
@@ -6823,6 +6910,9 @@ MonoBehaviour:
   leftNeighbor: {fileID: 310591287}
   rightNeighbor: {fileID: 835083793}
   oppositePlayer: {fileID: 730438039}
+  fullHealthColor: {r: 0.69803923, g: 0.32156864, b: 0.8, a: 1}
+  lowHealthColor: {r: 0.18039216, g: 0.039215688, b: 0.25882354, a: 1}
+  myHealthLiquidImage: {fileID: 0}
 --- !u!114 &1770890860
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6838,6 +6928,42 @@ MonoBehaviour:
   personality: 0
   selfEntity: {fileID: 1770890859}
   hand: []
+--- !u!136 &1770890861
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1770890857}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 1.5
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.5, z: 0}
+--- !u!114 &1770890862
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1770890857}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64b3110e69fe79b4e895147014c6ba1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  associatedEntity: {fileID: 1770890859}
 --- !u!1 &1786961153
 GameObject:
   m_ObjectHideFlags: 0

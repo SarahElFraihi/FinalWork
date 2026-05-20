@@ -38,10 +38,33 @@ public class PlayerEntity : MonoBehaviour
     public PlayerEntity rightNeighbor;
     public PlayerEntity oppositePlayer;
 
+    [Header("Couleurs de la Fiole")]
+    public Color fullHealthColor = Color.red; // Ta belle couleur de base
+    public Color lowHealthColor = new Color(0.2f, 0.05f, 0.05f); // La version très sombre
+
     void Start()
     {
         currentHealth = maxHealth;
+
+        if (myHealthLiquidImage != null)
+        {
+            myHealthLiquidImage.fillAmount = 1f;
+            myHealthLiquidImage.color = fullHealthColor;
+        }
     }
+
+    void Update()
+    {
+        if (!isBot && myHealthLiquidImage != null)
+        {
+            float healthRatio = (float)currentHealth / maxHealth;
+            myHealthLiquidImage.fillAmount = healthRatio;
+            myHealthLiquidImage.color = Color.Lerp(lowHealthColor, fullHealthColor, healthRatio);
+        }
+    }
+
+    [Header("UI Spécifique Entité")]
+    public UnityEngine.UI.Image myHealthLiquidImage; 
 
     public void TakeDamage(int amount)
     {
@@ -51,18 +74,19 @@ public class PlayerEntity : MonoBehaviour
         {
             if (isShielded) { isShielded = false; return; }
             amount = Mathf.RoundToInt(amount * defenseMultiplier);
-
-            // THORN : Si le joueur a des épines, il renvoie un peu de dégâts (Logiquement géré ici)
-            if (thorns > 0) Debug.Log(playerName + " reflects damage via Thorns!");
         }
 
-        currentHealth += amount; 
+        currentHealth += amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
-        // LINK : Si lié, le voisin prend aussi cher
+        if (myHealthLiquidImage != null)
+        {
+            myHealthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
+        }
+
         if (isLinked && amount < 0)
         {
-            isLinked = false; 
+            isLinked = false;
             if (rightNeighbor != null) rightNeighbor.TakeDamage(amount / 2);
         }
 

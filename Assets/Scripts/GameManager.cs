@@ -7,7 +7,6 @@ public class GameManager : MonoBehaviour
 {
     [Header("UI Elements")]
     public TextMeshProUGUI timerText; 
-    public Image healthLiquidImage;
     public GameObject resolutionPanel; 
     public TextMeshProUGUI resultsText; 
     public TextMeshProUGUI goldText;
@@ -44,6 +43,9 @@ public class GameManager : MonoBehaviour
     [Header("Entities")]
     public PlayerEntity playerEntity; 
     public List<PlayerEntity> botEntities;
+
+    [Header("Targeting")]
+    public PlayerEntity selectedTarget;
     
     [System.Serializable]
     public class TurnAction
@@ -55,10 +57,6 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        if (healthLiquidImage != null)
-    {
-        healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
-    }
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         UpdateGoldUI();
         StartTimer();
@@ -332,19 +330,27 @@ public class GameManager : MonoBehaviour
         
         // On appelle TakeDamage sur la cible (Bot ou Joueur)
         target.TakeDamage(value); 
-
-        // SI LA CIBLE EST LE JOUEUR : on met aussi à jour les variables de l'UI
-        if (!target.isBot)
-        {
-            currentHealth = target.currentHealth;
-            if (healthLiquidImage != null) 
-                healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
-        }
     }
 
     public void SelectCard(CardData data)
     {
-        if (!isResolutionPhase) selectedCard = data;
+        if (!isResolutionPhase) 
+        {
+            selectedCard = data;
+
+            TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
+            if (tm != null)
+            {
+                if (data != null && data.targetMode == CardData.TargetMode.Chosen)
+                {
+                    tm.StartTargeting();
+                }
+                else
+                {
+                    tm.ResetArrow();
+                }
+            }
+        }
     }
 
     void ApplyPassiveRules()
@@ -356,15 +362,16 @@ public class GameManager : MonoBehaviour
         {
             if (p.isPoisoned) p.TakeDamage(-5);
             if (p.isOnFire) p.TakeDamage(-10);
-
-            // MISE À JOUR VISUELLE : Si c'est TOI qui prends des dégâts passifs
-            if (p == playerEntity && healthLiquidImage != null)
-            {
-                currentHealth = p.currentHealth;
-                healthLiquidImage.fillAmount = (float)currentHealth / maxHealth;
-            }
         }
         UpdateGoldUI();
+    }
+
+    public void SetSelectedTarget(PlayerEntity target)
+    {
+        if (target == null || target.isBot == false) return; // Sécurité : on ne peut cibler qu'un ennemi
+
+        selectedTarget = target;
+        Debug.Log("<color=green>[Targeting]</color> Cible sélectionnée : " + target.gameObject.name);
     }
 
 }

@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine.UI; 
 
 public class HandManager : MonoBehaviour
 {
@@ -10,77 +9,78 @@ public class HandManager : MonoBehaviour
 
     void Start()
     {
+        // Plus d'attente, on remplit la main immédiatement au lancement
         GenerateRandomHand();
     }
 
     public void GenerateRandomHand()
     {
+        AICardGenerator aiGen = Object.FindFirstObjectByType<AICardGenerator>();
+
         foreach (CardDisplay slot in cardSlots)
         {
-            if (allCardsInGame.Count > 0)
+            // PRIORITÉ : On pioche dans le stock IA s'il y a quelque chose
+            if (aiGen != null && aiGen.aiCardPool.Count > 0)
             {
-                int randomIndex = Random.Range(0, allCardsInGame.Count);
-                slot.LoadCard(allCardsInGame[randomIndex]);
+                slot.LoadCard(aiGen.aiCardPool.Dequeue());
+                aiGen.FillPool(); 
+            }
+            else // FALLBACK : Tes cartes créées si le stock IA est vide
+            {
+                if (allCardsInGame.Count > 0)
+                {
+                    int randomIndex = Random.Range(0, allCardsInGame.Count);
+                    slot.LoadCard(allCardsInGame[randomIndex]);
+                }
             }
         }
     }
 
-    public CardDisplay GetRandomCardFromHand()
+    public void RefillHand()
     {
-        int randomIndex = Random.Range(0, cardSlots.Count);
-        return cardSlots[randomIndex];
+        GameManager gm = Object.FindFirstObjectByType<GameManager>();
+        AICardGenerator aiGen = Object.FindFirstObjectByType<AICardGenerator>();
+
+        if (gm == null || aiGen == null) return;
+
+        foreach (CardDisplay slot in cardSlots)
+        {
+            // On vérifie si ce slot est celui qui a été vidé (comparaison de la donnée de carte)
+            if (slot.cardData == gm.selectedCard)
+            {
+                Debug.Log("<color=yellow>[HandManager]</color> Slot vide trouvé. Tentative de pioche IA...");
+
+                if (aiGen.aiCardPool.Count > 0)
+                {
+                    CardData generatedCard = aiGen.aiCardPool.Dequeue(); 
+                    slot.LoadCard(generatedCard);
+                    Debug.Log("<color=green>[HandManager]</color> Succès : Carte IA insérée !");
+                    aiGen.FillPool(); 
+                }
+                else 
+                {
+                    Debug.LogWarning("<color=red>[HandManager]</color> Stock IA vide ! Utilisation d'une carte manuelle.");
+                    if (allCardsInGame.Count > 0)
+                    {
+                        int randomIndex = Random.Range(0, allCardsInGame.Count);
+                        slot.LoadCard(allCardsInGame[randomIndex]);
+                    }
+                }
+            }
+        }
     }
 
     public void ResetAllCardsVisuals()
     {
-        foreach (CardDisplay slot in cardSlots)
-        {
-            // On ne passe plus qu'un seul argument : false (car on ne veut pas que ce soit grisé)
-            slot.SetVisualState(false); 
-            slot.SetYOffset(0); 
-        }
+        foreach (CardDisplay slot in cardSlots) { slot.SetVisualState(false); slot.SetYOffset(0); }
     }
 
     public void HighlightSelectedCard(CardDisplay selectedSlot)
     {
         foreach (CardDisplay slot in cardSlots)
         {
-            if (slot == selectedSlot)
-            {
-                // La carte choisie n'est PAS grisée
-                slot.SetVisualState(false); 
-                slot.SetYOffset(0);
-            }
-            else
-            {
-                // Les autres SONT grisées
-                slot.SetVisualState(true); 
-                slot.SetYOffset(-40f); 
-            }
-        }
-    }
-    public void RefillHand()
-    {
-        GameManager gm = Object.FindFirstObjectByType<GameManager>();
-        AICardGenerator aiGen = Object.FindFirstObjectByType<AICardGenerator>();
-
-        foreach (CardDisplay slot in cardSlots)
-        {
-            if (gm != null && slot.cardData == gm.selectedCard)
-            {
-                // 50% de chance de demander une carte à l'IA en temps réel
-                if (aiGen != null && !aiGen.useSimulator && Random.value > 0.5f)
-                {
-                    aiGen.RequestNewCard((generatedCard) => {
-                        slot.LoadCard(generatedCard);
-                    });
-                }
-                else // Sinon, pioche classique instantanée
-                {
-                    int randomIndex = Random.Range(0, allCardsInGame.Count);
-                    slot.LoadCard(allCardsInGame[randomIndex]);
-                }
-            }
+            if (slot == selectedSlot) { slot.SetVisualState(false); slot.SetYOffset(0); }
+            else { slot.SetVisualState(true); slot.SetYOffset(-40f); }
         }
     }
 }
