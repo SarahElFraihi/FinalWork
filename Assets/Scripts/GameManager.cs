@@ -3,6 +3,15 @@ using TMPro;
 using System.Collections.Generic;
 using UnityEngine.UI;
 
+[System.Serializable]
+public class ActiveRuleInstance
+{
+    public string ruleName;       
+    public string ruleDescription; 
+    public CardData.EffectType effectType;
+    public float value;
+}
+
 public class GameManager : MonoBehaviour
 {
     [Header("UI Elements")]
@@ -10,6 +19,8 @@ public class GameManager : MonoBehaviour
     public GameObject resolutionPanel; 
     public TextMeshProUGUI resultsText; 
     public TextMeshProUGUI goldText;
+    public TMPro.TextMeshProUGUI activeRulesText;
+    public RulesDashboardUI dashboardController;
 
     [Header("Player Stats")]
     public int maxHealth = 100;
@@ -29,8 +40,7 @@ public class GameManager : MonoBehaviour
     public bool isMirrorShielded = false;
 
     [Header("Rule Engine")]
-    // Liste de tous les effets de règles actuellement en vigueur
-    public List<CardData.CardEffect> activeRules = new List<CardData.CardEffect>();
+    public List<ActiveRuleInstance> activeRules = new List<ActiveRuleInstance>();
 
     [Header("History")]
     public CardData lastPlayedCard;
@@ -57,6 +67,10 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        UpdateActiveRulesUI();
+
+        if (playerEntity != null) { playerEntity.isInvisible = false; playerEntity.isWanted = false; }
+        foreach (PlayerEntity bot in botEntities) { bot.isInvisible = false; bot.isWanted = false; }
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         UpdateGoldUI();
         StartTimer();
@@ -173,7 +187,27 @@ public class GameManager : MonoBehaviour
                             action.target = allParticipants[Random.Range(0, allParticipants.Count)];
                     }
                     break;
-                // ... garde les autres cases (Left, Right, etc.) ...
+
+                // Voisin de gauche/droite/opposé sont déterminés par la position dans la liste des participants
+                case CardData.TargetMode.Left:
+                    action.target = performer.leftNeighbor; 
+                    break;
+
+                case CardData.TargetMode.Right:
+                    action.target = performer.rightNeighbor; 
+                    break;
+
+                case CardData.TargetMode.Opposite:
+                    action.target = performer.oppositePlayer; 
+                    break;
+
+                case CardData.TargetMode.Everyone:
+                    action.target = performer; 
+                    break;
+
+                default:
+                    action.target = null;
+                    break;
             }
 
             allActionsThisTurn.Add(action);
@@ -268,19 +302,27 @@ public class GameManager : MonoBehaviour
 
     string ExecuteRuleCards(List<TurnAction> actions)
     {
-        string log = "";
-        foreach (TurnAction act in actions)
+        string log = ""; 
+        foreach (TurnAction act in actions) 
         {
-            foreach (var effect in act.card.effects)
+            foreach (var effect in act.card.effects) 
             {
-                // On applique l'effet immédiatement (ex: Timer) ET on l'enregistre en règle passive
                 ResolveEffect(effect, playerEntity, act.performer); 
-                activeRules.RemoveAll(r => r.effectType == effect.effectType);
-                activeRules.Add(effect);
+                activeRules.RemoveAll(r => r.effectType == effect.effectType); 
+                
+                ActiveRuleInstance newRule = new ActiveRuleInstance();
+                newRule.ruleName = act.card.cardName;
+                newRule.ruleDescription = act.card.description; 
+                newRule.effectType = effect.effectType;
+                newRule.value = effect.value;
+                
+                activeRules.Add(newRule);
             }
-            log += $"<color=#FFD700>RULE:</color> {act.card.cardName} is active!\n";
+            log += $"<color=#FFD700>RULE:</color> {act.card.cardName} is active!\n"; 
         }
-        return log;
+        UpdateActiveRulesUI(); 
+
+        return log; 
     }
 
     string ExecuteActionCards(List<TurnAction> actions)
@@ -368,10 +410,56 @@ public class GameManager : MonoBehaviour
 
     public void SetSelectedTarget(PlayerEntity target)
     {
-        if (target == null || target.isBot == false) return; // Sécurité : on ne peut cibler qu'un ennemi
+        if (target == null || target.isBot == false) return;
 
         selectedTarget = target;
         Debug.Log("<color=green>[Targeting]</color> Cible sélectionnée : " + target.gameObject.name);
     }
 
+    public void UpdateActiveRulesUI()
+    {
+        if (activeRulesText == null) return; 
+
+        if (activeRules.Count == 0) 
+        {
+            activeRulesText.text = "<size=22><b>MANOR LAWS:</b></size>\n\n<size=14><i>No laws active.</i></size>";
+            return;
+        }
+
+        string textBuffer = "<size=22><b>MANOR LAWS:</b></size>\n\n";
+
+        foreach (ActiveRuleInstance rule in activeRules) 
+        {
+            textBuffer += $"<b><color=#FFD700>• {rule.ruleName}</color></b>\n";
+            textBuffer += $"<size=-3><i>{rule.ruleDescription}</i></size>\n\n";
+        }
+
+        activeRulesText.text = textBuffer; 
+
+        if (dashboardController != null && timerRunning) //
+        {
+            dashboardController.TriggerNewRuleAlert();
+        }
+    }
+
+    string GetRuleDescription(CardData.CardEffect rule)
+    {
+        switch (rule.effectType)
+        {
+            case CardData.EffectType.TimerMod:
+                return $"Chrono réglé à {rule.value}s";
+            case CardData.EffectType.GravityFlip:
+                return "Gravité inversée !";
+            case CardData.EffectType.Poison:
+                return "Brume toxique active (-5 PV)";
+            case CardData.EffectType.Burn:
+                return "Sol enflammé actif (-10 PV)";
+            case CardData.EffectType.HandSize:
+                return $"Main max fixée à {rule.value}";
+            case CardData.EffectType.Thorns:
+                return $"Épines spectrales (+{rule.value})";
+            default:
+                return $"{rule.effectType} est actif";
+        }
+    }
 }

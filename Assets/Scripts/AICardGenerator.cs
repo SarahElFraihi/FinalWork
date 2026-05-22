@@ -93,30 +93,31 @@ public class AICardGenerator : MonoBehaviour
 
     IEnumerator PostRequest(System.Action<CardData> callback)
     {
-        string prompt = "Generate a funny and chaotic ghost card for a party game. Return ONLY a valid JSON object. " +
-            "You MUST include exactly ONE effect in the 'effects' array. " +
-            "Format: { \"cardName\": \"Name\", \"description\": \"Desc\", \"cardType\": 0, \"targetMode\": 1, " +
-            "\"effects\": [{ \"effectType\": 0, \"value\": 10 }] }. " +
-            "CRITICAL RULES FOR GENERATION:\n" +
-            "- cardType: 0=Action, 1=Rule, 2=Special\n" +
+        string prompt = "You are a hilarious, chaotic, and sarcastic ghost party game designer. " +
+            "Generate ONE funny ghost-themed card. Return ONLY a valid JSON object with double quotes. " +
+            "Format: { \"cardName\": \"Name\", \"description\": \"Desc\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [{ \"effectType\": 0, \"value\": 15 }] }\n\n" +
+            "THEME RULES:\n" +
+            "- Use spectral puns, dark humor, ghost tropes (ectoplasm, haunting, possessions, chains).\n" +
+            "- The description MUST perfectly and explicitly justify the chosen effectType.\n\n" +
+            "CRITICAL MECHANICAL RULES:\n" +
+            "- cardType: 0=Action (red), 1=Rule (yellow), 2=Special (purple)\n" +
             "- targetMode: 0=Self, 1=Chosen (enemy), 6=Everyone\n" +
-            "- effectType & value instructions:\n" +
-            "  * 0 (Damage): value must be POSITIVE (ex: 15)\n" +
-            "  * 1 (Heal): value must be POSITIVE (ex: 10)\n" +
-            "  * 2 (Gold): give or steal gold (ex: 20 or -15)\n" +
-            "  * 3 (Karma): modify player's alignment (ex: 10 or -10)\n" +
-            "  * 4 (Luck): modify luck (ex: 5)\n" +
-            "  * 5 (Frozen): skip turn, set value to 1\n" +
-            "  * 6 (Burn): set on fire, set value to 1\n" +
-            "  * 7 (Poison): poisoned state, set value to 1\n" +
-            "  * 8 (Shield): block next attack, set value to 1\n" +
-            "  * 9 (Invisible): can't be targeted, set value to 1\n" +
-            "  * 10 (Silenced): can't use rules/specials, set value to 1\n" +
-            "  * 11 (Wanted): grants gold when attacked, set value to 1\n" +
-            "  * 12 (Linked): shares damage with right neighbor, set value to 1\n" +
-            "  * 13 (Thorns): reflects flat damage (ex: 5)\n" +
-            "  * 14 (HandSize): change max hand size (ex: 4 or 6)\n" +
-            "Make the description match the effect chosen. Use double quotes for all keys.";
+            "- effectType & value rules (Pick exactly ONE):\n" +
+            "  * 0 (Damage): POSITIVE value (ex: 20). Description must be an attack.\n" +
+            "  * 1 (Heal): POSITIVE value (ex: 15). Description must be a healing/restoration.\n" +
+            "  * 2 (Gold): Give or steal coins (ex: 25 or -20).\n" +
+            "  * 3 (Karma): Change alignment (ex: 15 or -15).\n" +
+            "  * 5 (Frozen): Skip turn. Value MUST be 1.\n" +
+            "  * 6 (Burn): On fire state. Value MUST be 1.\n" +
+            "  * 7 (Poison): Toxic state. Value MUST be 1.\n" +
+            "  * 8 (Shield): Block next attack. Value MUST be 1.\n" +
+            "  * 9 (Invisible): Untargetable. Value MUST be 1.\n" +
+            "  * 10 (Silenced): Block Special/Rule cards. Value MUST be 1.\n" +
+            "  * 12 (Linked): Damage sharing. Value MUST be 1.\n\n" +
+            "GOLDEN EXAMPLES TO FOLLOW:\n" +
+            "Example A: { \"cardName\": \"Ecto-Tax Audit\", \"description\": \"The IRS of the afterlife found errors in your files. Pay up!\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [{ \"effectType\": 2, \"value\": -20 }] }\n" +
+            "Example B: { \"cardName\": \"Spooky Chilli Pepper\", \"description\": \"You swallowed a ghost pepper. Literally. You are now burning!\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [{ \"effectType\": 6, \"value\": 1 }] }\n" +
+            "Example C: { \"cardName\": \"Social Distancing Shield\", \"description\": \"You wrap yourself in a blanket of absolute social awkwardness. No one can touch you.\", \"cardType\": 1, \"targetMode\": 0, \"effects\": [{ \"effectType\": 8, \"value\": 1 }] }";
 
         GroqRequest req = new GroqRequest();
         req.model = "llama-3.1-8b-instant"; // Ton modèle ultra-rapide
