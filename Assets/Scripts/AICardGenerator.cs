@@ -2,169 +2,194 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 
 public class AICardGenerator : MonoBehaviour
 {
-    [Header("Mode Configuration")]
-    public bool useSimulator = false;
-
-    [Header("Groq API Configuration")]
-    private string apiKey = "";    
-    private string url = "https://api.groq.com/openai/v1/chat/completions";    
+    [Header("Ollama Local Configuration")]
+    private string url = "http://localhost:11434/api/generate";    
 
     [Header("AI Pool")]
-    public int maxPoolSize = 5;
+    public int maxPoolSize = 10; 
     public Queue<CardData> aiCardPool = new Queue<CardData>();
     private bool isFilling = false;
 
-    void Awake()
-    {
-        LoadAPIKey();
-    }
-
     void Start()
     {
-        // On attend que la clé soit chargée avant de remplir le pool
         FillPool();
-    }
-
-    void LoadAPIKey()
-    {
-        // On génère le chemin automatique vers le dossier secret, que ce soit dans l'éditeur ou dans le build final
-        string filePath = System.IO.Path.Combine(Application.streamingAssetsPath, "api_key.txt");
-
-        if (System.IO.File.Exists(filePath))
-        {
-            // On lit le texte et on retire les espaces ou retours à la ligne invisibles (.Trim())
-            apiKey = System.IO.File.ReadAllText(filePath).Trim();
-            Debug.Log("<color=green>[Groq Security]</color> Clé API chargée avec succès depuis StreamingAssets !");
-        }
-        else
-        {
-            Debug.LogError("<color=red>[Groq Security Error]</color> Fichier api_key.txt introuvable dans StreamingAssets !");
-        }
     }
 
     public void FillPool()
     {
         if (!isFilling && aiCardPool.Count < maxPoolSize)
         {
-            StartCoroutine(RefillRoutine());
+            StartCoroutine(RefillBatchRoutine());
         }
     }
 
-    IEnumerator RefillRoutine()
+    IEnumerator RefillBatchRoutine()
     {
         isFilling = true;
+
         while (aiCardPool.Count < maxPoolSize)
         {
-            CardData newCard = null;
             bool waiting = true;
+            List<AICardJSON> generatedCards = null;
 
-            RequestNewCard((card) => {
-                newCard = card;
+            StartCoroutine(PostBatchRequest((cards) => {
+                generatedCards = cards;
                 waiting = false;
-            });
+            }));
 
             while (waiting) yield return null;
 
-            if (newCard != null && newCard.cardName != "ERROR CARD")
+            if (generatedCards != null && generatedCards.Count == 3)
             {
-                aiCardPool.Enqueue(newCard);
-                Debug.Log("<color=cyan>[Groq Pool]</color> Carte ajoutée. Total : " + aiCardPool.Count);
+                foreach (AICardJSON cardData in generatedCards)
+                {
+                    CardData newCard = ConvertJSONToCardData(cardData);
+                    if (newCard != null)
+                    {
+                        aiCardPool.Enqueue(newCard);
+                        Debug.Log("<color=cyan>[Llama Pool]</color> Card added: " + newCard.cardName);
+                    }
+                }
             }
-            
-            yield return new WaitForSeconds(1.0f); // 1 seconde suffit largement avec Groq !
+            else
+            {
+                yield return new WaitForSeconds(1.5f);
+            }
+
+            yield return new WaitForSeconds(0.2f);
         }
+
         isFilling = false;
     }
 
-    public void RequestNewCard(System.Action<CardData> callback)
+    IEnumerator PostBatchRequest(System.Action<List<AICardJSON>> callback)
     {
-        if (useSimulator)
-        {
-            callback?.Invoke(CreateCardFromJSON(GetMockAIResponse()));
-        }
-        else
-        {
-            StartCoroutine(PostRequest(callback));
-        }
-    }
-
-    IEnumerator PostRequest(System.Action<CardData> callback)
-    {
-        string prompt = "You are a hilarious, chaotic, and sarcastic ghost party game designer. " +
-            "Generate ONE funny ghost-themed card. Return ONLY a valid JSON object with double quotes. " +
-            "Format: { \"cardName\": \"Name\", \"description\": \"Desc\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [{ \"effectType\": 0, \"value\": 15 }] }\n\n" +
-            "THEME RULES:\n" +
-            "- Use spectral puns, dark humor, ghost tropes (ectoplasm, haunting, possessions, chains).\n" +
-            "- The description MUST perfectly and explicitly justify the chosen effectType.\n\n" +
-            "CRITICAL MECHANICAL RULES:\n" +
-            "- cardType: 0=Action (red), 1=Rule (yellow), 2=Special (purple)\n" +
-            "- targetMode: 0=Self, 1=Chosen (enemy), 6=Everyone\n" +
-            "- effectType & value rules (Pick exactly ONE):\n" +
-            "  * 0 (Damage): POSITIVE value (ex: 20). Description must be an attack.\n" +
-            "  * 1 (Heal): POSITIVE value (ex: 15). Description must be a healing/restoration.\n" +
-            "  * 2 (Gold): Give or steal coins (ex: 25 or -20).\n" +
-            "  * 3 (Karma): Change alignment (ex: 15 or -15).\n" +
-            "  * 5 (Frozen): Skip turn. Value MUST be 1.\n" +
-            "  * 6 (Burn): On fire state. Value MUST be 1.\n" +
-            "  * 7 (Poison): Toxic state. Value MUST be 1.\n" +
-            "  * 8 (Shield): Block next attack. Value MUST be 1.\n" +
-            "  * 9 (Invisible): Untargetable. Value MUST be 1.\n" +
-            "  * 10 (Silenced): Block Special/Rule cards. Value MUST be 1.\n" +
-            "  * 12 (Linked): Damage sharing. Value MUST be 1.\n\n" +
-            "GOLDEN EXAMPLES TO FOLLOW:\n" +
-            "Example A: { \"cardName\": \"Ecto-Tax Audit\", \"description\": \"The IRS of the afterlife found errors in your files. Pay up!\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [{ \"effectType\": 2, \"value\": -20 }] }\n" +
-            "Example B: { \"cardName\": \"Spooky Chilli Pepper\", \"description\": \"You swallowed a ghost pepper. Literally. You are now burning!\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [{ \"effectType\": 6, \"value\": 1 }] }\n" +
-            "Example C: { \"cardName\": \"Social Distancing Shield\", \"description\": \"You wrap yourself in a blanket of absolute social awkwardness. No one can touch you.\", \"cardType\": 1, \"targetMode\": 0, \"effects\": [{ \"effectType\": 8, \"value\": 1 }] }";
-
-        GroqRequest req = new GroqRequest();
-        req.model = "llama-3.1-8b-instant"; // Ton modèle ultra-rapide
-        req.messages = new List<GroqMessage> { new GroqMessage { role = "user", content = prompt } };
-        req.response_format = new GroqFormat { type = "json_object" };
-
-        string jsonData = JsonUtility.ToJson(req);
+        int[] availableEffects = { 0, 1, 2, 5, 6, 7, 8, 11, 15, 16 };
         
+        int[] chosenEffects = new int[3];
+        int[] forcedTypes = new int[3];
+        int[] forcedTargets = new int[3];
+        float[] forcedValues = new float[3];
+        string[] instructions = new string[3];
+
+        for (int i = 0; i < 3; i++)
+        {
+            int eff = availableEffects[Random.Range(0, availableEffects.Length)];
+            chosenEffects[i] = eff;
+            
+            if (eff == 15 || eff == 16)
+            {
+                forcedTypes[i] = 1;
+                forcedTargets[i] = 6;
+                forcedValues[i] = (eff == 15) ? 15f : 1f;
+                instructions[i] = (eff == 15) ? "setting the next round timer to its maximum duration of 15 seconds" : "flipping gravity or turn order";
+            }
+            else if (eff == 5 || eff == 6 || eff == 7 || eff == 8 || eff == 11)
+            {
+                forcedTypes[i] = 2;
+                forcedValues[i] = 1f;
+                forcedTargets[i] = (eff == 8) ? 0 : 1;
+                if (eff == 5) instructions[i] = "freezing an opponent to make them skip their entire next turn";
+                else if (eff == 6) instructions[i] = "setting an opponent on fire to deal damage over time";
+                else if (eff == 7) instructions[i] = "poisoning an opponent with toxic slime to deal damage each turn";
+                else if (eff == 8) instructions[i] = "giving yourself a protective shield that blocks the next attack";
+                else if (eff == 11) instructions[i] = "silencing an opponent to prevent them from playing Yellow or Purple cards next turn";
+            }
+            else
+            {
+                forcedTypes[i] = 0;
+                forcedTargets[i] = 1;
+                forcedValues[i] = 15f;
+                if (eff == 0) instructions[i] = "a spooky offensive attack dealing 15 damage";
+                else if (eff == 1) instructions[i] = "ghostly healing or restoration of 15 health points";
+                else if (eff == 2) instructions[i] = "stealing 15 gold from the target opponent";
+            }
+        }
+
+        string prompt = "You are a hilarious ghost party game designer. Generate a batch of EXACTLY 3 unique spooky cards.\n" +
+                        "For each card, your description MUST be ultra-short, maximum 10 words to fit the UI template.\n\n" +
+                        $"Card 1 theme: {instructions[0]}\n" +
+                        $"Card 2 theme: {instructions[1]}\n" +
+                        $"Card 3 theme: {instructions[2]}\n\n" +
+                        "You MUST follow this exact JSON structure down to lowercase keys:\n" +
+                        "{\n" +
+                        "  \"cards\": [\n" +
+                        "    { \"cardName\": \"Unique ghost pun title\", \"description\": \"Max 10 words phrase\" },\n" +
+                        "    { \"cardName\": \"Unique ghost pun title\", \"description\": \"Max 10 words phrase\" },\n" +
+                        "    { \"cardName\": \"Unique ghost pun title\", \"description\": \"Max 10 words phrase\" }\n" +
+                        "  ]\n" +
+                        "}\n\n" +
+                        "Return ONLY the raw JSON object, no markdown, no code blocks.";
+
+        OllamaRequest payload = new OllamaRequest();
+        payload.model = "llama3";
+        payload.prompt = prompt;
+        payload.format = "json"; 
+        payload.stream = false;
+        
+        payload.options = new OllamaOptions();
+        payload.options.num_predict = 400; 
+        payload.options.temperature = 0.9f;
+        payload.options.seed = Random.Range(1, 999999);
+
+        string jsonBody = JsonUtility.ToJson(payload);
+
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
-            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
             request.uploadHandler = new UploadHandlerRaw(bodyRaw);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("Authorization", "Bearer " + apiKey);
 
             yield return request.SendWebRequest();
 
             if (request.result == UnityWebRequest.Result.Success)
             {
-                string cleanedJson = CleanGroqResponse(request.downloadHandler.text);
-                if (!string.IsNullOrEmpty(cleanedJson))
-                    callback?.Invoke(CreateCardFromJSON(cleanedJson));
-                else
-                    callback?.Invoke(CreateCardFromJSON(GetMockAIResponse()));
+                try
+                {
+                    OllamaResponse responseContainer = JsonUtility.FromJson<OllamaResponse>(request.downloadHandler.text);
+                    LlamaBatchResponse batchContainer = JsonUtility.FromJson<LlamaBatchResponse>(responseContainer.response);
+                    
+                    if (batchContainer != null && batchContainer.cards != null && batchContainer.cards.Count == 3)
+                    {
+                        for (int i = 0; i < 3; i++)
+                        {
+                            batchContainer.cards[i].cardType = forcedTypes[i];
+                            batchContainer.cards[i].targetMode = forcedTargets[i];
+                            batchContainer.cards[i].effects = new List<AIEffectJSON>();
+                            
+                            AIEffectJSON eff = new AIEffectJSON();
+                            eff.effectType = chosenEffects[i];
+                            eff.value = forcedValues[i];
+                            batchContainer.cards[i].effects.Add(eff);
+                        }
+                        callback?.Invoke(batchContainer.cards);
+                    }
+                    else
+                    {
+                        callback?.Invoke(null);
+                    }
+                }
+                catch
+                {
+                    callback?.Invoke(null);
+                }
             }
             else 
             { 
-                Debug.LogError("[Groq Error] " + request.downloadHandler.text);
-                callback?.Invoke(CreateCardFromJSON(GetMockAIResponse()));
+                callback?.Invoke(null);
             }
         }
     }
 
-    string CleanGroqResponse(string raw)
+    public CardData ConvertJSONToCardData(AICardJSON data)
     {
-        try 
-        {
-            GroqResponse res = JsonUtility.FromJson<GroqResponse>(raw);
-            return res.choices[0].message.content.Trim();
-        }
-        catch { return ""; }
-    }
+        if (data == null || string.IsNullOrEmpty(data.cardName)) return null;
 
-    public CardData CreateCardFromJSON(string jsonString)
-    {
-        AICardJSON data = JsonUtility.FromJson<AICardJSON>(jsonString);
         CardData newCard = ScriptableObject.CreateInstance<CardData>();
         newCard.cardName = data.cardName;
         newCard.description = data.description;
@@ -176,30 +201,35 @@ public class AICardGenerator : MonoBehaviour
         else if (newCard.type == CardData.CardType.Rule) newCard.cardColor = new Color(1f, 0.85f, 0f);
         else newCard.cardColor = new Color(0.6f, 0.1f, 0.9f);
 
-        foreach (var eff in data.effects)
+        if (data.effects != null)
         {
-            CardData.CardEffect newEffect = new CardData.CardEffect { 
-                effectType = (CardData.EffectType)eff.effectType, 
-                value = eff.value 
-            };
-            newCard.effects.Add(newEffect);
+            foreach (var eff in data.effects)
+            {
+                CardData.CardEffect newEffect = new CardData.CardEffect { 
+                    effectType = (CardData.EffectType)eff.effectType, 
+                    value = eff.value 
+                };
+                newCard.effects.Add(newEffect);
+            }
         }
         return newCard;
     }
 
-    public string GetMockAIResponse()
-    {
-        return "{ \"cardName\": \"ERROR CARD\", \"description\": \"AI Failed to respond.\", \"cardType\": 0, \"targetMode\": 1, \"effects\": [] }";
-    }
+    [System.Serializable]
+    public class OllamaRequest { public string model; public string prompt; public string format; public bool stream; public OllamaOptions options; }
 
-    // Classes de sérialisation pour Groq
-    [System.Serializable] public class GroqRequest { public string model; public List<GroqMessage> messages; public GroqFormat response_format; }
-    [System.Serializable] public class GroqMessage { public string role; public string content; }
-    [System.Serializable] public class GroqFormat { public string type; }
-    [System.Serializable] public class GroqResponse { public List<GroqChoice> choices; }
-    [System.Serializable] public class GroqChoice { public GroqChoiceMessage message; }
-    [System.Serializable] public class GroqChoiceMessage { public string content; }
+    [System.Serializable]
+    public class OllamaOptions { public int num_predict; public float temperature; public int seed; }
 
-    [System.Serializable] public class AICardJSON { public string cardName; public string description; public int cardType; public int targetMode; public List<AIEffectJSON> effects; }
-    [System.Serializable] public class AIEffectJSON { public int effectType; public float value; }
+    [System.Serializable]
+    public class OllamaResponse { public string response; }
+
+    [System.Serializable]
+    public class LlamaBatchResponse { public List<AICardJSON> cards; }
+
+    [System.Serializable] 
+    public class AICardJSON { public string cardName; public string description; public int cardType; public int targetMode; public List<AIEffectJSON> effects; }
+    
+    [System.Serializable] 
+    public class AIEffectJSON { public int effectType; public float value; }
 }

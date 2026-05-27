@@ -69,8 +69,21 @@ public class GameManager : MonoBehaviour
     {
         UpdateActiveRulesUI();
 
-        if (playerEntity != null) { playerEntity.isInvisible = false; playerEntity.isWanted = false; }
-        foreach (PlayerEntity bot in botEntities) { bot.isInvisible = false; bot.isWanted = false; }
+        if (playerEntity != null) 
+        { 
+            playerEntity.gold = Random.Range(0, 10);
+            playerEntity.isInvisible = false; 
+            playerEntity.isWanted = false; 
+        }
+
+        foreach (PlayerEntity bot in botEntities) 
+        { 
+            bot.gold = Random.Range(0, 10);
+            bot.isInvisible = false; 
+            bot.isWanted = false; 
+        }
+
+        UpdateActiveRulesUI();
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         UpdateGoldUI();
         StartTimer();
@@ -152,11 +165,14 @@ public class GameManager : MonoBehaviour
 
             // --- 2. LOI : SILENCED (SILENCE) ---
             // Si le joueur est silencieux, il ne peut pas jouer de cartes Special ou Rule
-            if (performer.isSilenced && action.card.type != CardData.CardType.Action)
+            if (performer.isSilenced)
             {
-                Debug.Log(performer.playerName + " is silenced and can't use Special/Rule cards!");
                 performer.isSilenced = false; 
-                continue;
+                if (action.card.type != CardData.CardType.Action)
+                {
+                    Debug.Log(performer.playerName + " is silenced and can't use Special/Rule cards!");
+                    continue;
+                }
             }
 
             // --- 3. LOI : CONFUSED (CONFUS) ---
@@ -231,7 +247,19 @@ public class GameManager : MonoBehaviour
                 else target.TakeDamage(-dmg);
                 break;
             case CardData.EffectType.Heal: target.TakeDamage((int)effect.value); break;
-            case CardData.EffectType.Gold: target.gold += (int)effect.value; break;
+            case CardData.EffectType.Gold: 
+                int goldAmount = (int)effect.value;
+                if (target == performer)
+                {
+                    target.gold += goldAmount;
+                }
+                else
+                {
+                    if (target.gold < goldAmount) goldAmount = target.gold;
+                    target.gold -= goldAmount;
+                    performer.gold += goldAmount;
+                }
+                break;
             case CardData.EffectType.Karma: target.karma += (int)effect.value; break;
             case CardData.EffectType.Luck: target.luck += (int)effect.value; break;
             

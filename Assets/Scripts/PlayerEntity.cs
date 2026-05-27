@@ -61,10 +61,16 @@ public class PlayerEntity : MonoBehaviour
             myHealthLiquidImage.fillAmount = healthRatio;
             myHealthLiquidImage.color = Color.Lerp(lowHealthColor, fullHealthColor, healthRatio);
         }
+
+        if (shieldVisual != null)
+        {
+            shieldVisual.SetActive(isShielded);
+        }
     }
 
     [Header("UI Spécifique Entité")]
-    public UnityEngine.UI.Image myHealthLiquidImage; 
+    public UnityEngine.UI.Image myHealthLiquidImage;
+    public GameObject shieldVisual;
 
     public void TakeDamage(int amount)
     {
