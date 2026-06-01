@@ -19,19 +19,15 @@ public class HandManager : MonoBehaviour
 
         foreach (CardDisplay slot in cardSlots)
         {
-            // PRIORITÉ : On pioche dans le stock IA s'il y a quelque chose
             if (aiGen != null && aiGen.aiCardPool.Count > 0)
             {
                 slot.LoadCard(aiGen.aiCardPool.Dequeue());
                 aiGen.FillPool(); 
             }
-            else // FALLBACK : Tes cartes créées si le stock IA est vide
+           else 
             {
-                if (allCardsInGame.Count > 0)
-                {
-                    int randomIndex = Random.Range(0, allCardsInGame.Count);
-                    slot.LoadCard(allCardsInGame[randomIndex]);
-                }
+                CardData baseCard = GetWeightedRandomBaseCard();
+                if (baseCard != null) slot.LoadCard(baseCard);
             }
         }
     }
@@ -59,12 +55,9 @@ public class HandManager : MonoBehaviour
                 }
                 else 
                 {
-                    Debug.LogWarning("<color=red>[HandManager]</color> Stock IA vide ! Utilisation d'une carte manuelle.");
-                    if (allCardsInGame.Count > 0)
-                    {
-                        int randomIndex = Random.Range(0, allCardsInGame.Count);
-                        slot.LoadCard(allCardsInGame[randomIndex]);
-                    }
+                    Debug.LogWarning("<color=red>[HandManager]</color> Stock IA vide ! Utilisation d'une carte manuelle pondérée.");
+                    CardData baseCard = GetWeightedRandomBaseCard();
+                    if (baseCard != null) slot.LoadCard(baseCard);
                 }
             }
         }
@@ -140,5 +133,28 @@ public class HandManager : MonoBehaviour
             slot.visualContent.anchoredPosition = Vector2.zero;
             slot.visualContent.localScale = Vector3.one;
         }
+    }
+
+    private CardData GetWeightedRandomBaseCard()
+    {
+        if (allCardsInGame == null || allCardsInGame.Count == 0) return null;
+
+        // 1. On trie tes cartes de base par catégorie
+        List<CardData> actionCards = allCardsInGame.FindAll(c => c.type == CardData.CardType.Action);
+        List<CardData> ruleCards = allCardsInGame.FindAll(c => c.type == CardData.CardType.Rule);
+        List<CardData> specialCards = allCardsInGame.FindAll(c => c.type == CardData.CardType.Special);
+
+        float roll = Random.Range(0f, 100f);
+
+        if (roll < 60f && actionCards.Count > 0)
+            return actionCards[Random.Range(0, actionCards.Count)];
+        
+        else if (roll < 80f && ruleCards.Count > 0)
+            return ruleCards[Random.Range(0, ruleCards.Count)];
+        
+        else if (specialCards.Count > 0)
+            return specialCards[Random.Range(0, specialCards.Count)];
+
+        return allCardsInGame[Random.Range(0, allCardsInGame.Count)];
     }
 }

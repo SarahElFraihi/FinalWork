@@ -23,6 +23,7 @@ public class GameManager : MonoBehaviour
     public GameObject validateTurnButton;
     public GameObject playerHandUI;
     public CardDisplay centerCardDisplay;
+    public Transform centerTableViewPoint;
 
     [Header("Timer Settings")]
     public float timeLeft = 15f; 
@@ -44,6 +45,10 @@ public class GameManager : MonoBehaviour
     public List<PlayerEntity> turnOrder = new List<PlayerEntity>();
     public int currentTurnIndex = 0;
     public int currentRoundNumber = 1;
+
+    [Header("Visual Effects")]
+    public GameObject attackProjectilePrefab;
+    public GameObject stealProjectilePrefab;  
 
     [Header("Compatibility Fields")]
     public bool isResolutionPhase = false;
@@ -276,16 +281,12 @@ public class GameManager : MonoBehaviour
 
         selectedTarget = target;
 
-        TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
-        if (tm != null) tm.ResetArrow();
-
         if (validateTurnButton != null) 
         {
             validateTurnButton.SetActive(true);
             SetValidateButtonColor(new Color(0.4f, 0.4f, 0.4f, 1f));
         }
     }
-
     void ExecuteHumanCardNoTarget()
     {
         PlayerEntity performer = turnOrder[currentTurnIndex];
@@ -318,6 +319,9 @@ public class GameManager : MonoBehaviour
         timerRunning = false;
         UpdateTimerUI();
         yield return new WaitForSeconds(0.3f);
+
+        TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
+        if (tm != null) tm.ResetArrow();
 
         if (validateTurnButton != null) validateTurnButton.SetActive(false);
         ExecuteCardAction(turnOrder[currentTurnIndex], selectedCard, selectedTarget);
@@ -379,13 +383,20 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // Cette fonction sert maintenant de passerelle sécurisée pour lancer notre Coroutine de mise en scène
     void ExecuteCardAction(PlayerEntity performer, CardData card, PlayerEntity target)
+    {
+        StartCoroutine(ExecuteCardActionRoutine(performer, card, target));
+    }
+
+    System.Collections.IEnumerator ExecuteCardActionRoutine(PlayerEntity performer, CardData card, PlayerEntity target)
     {
         if (resolutionPanel != null) resolutionPanel.SetActive(true);
         isResolutionPhase = true;
         timerRunning = false;
         UpdateTimerUI();
 
+        // --- 1. SÉQUENCE LECTURE : On affiche la carte en grand (la caméra ne bouge pas encore) ---
         if (centerCardDisplay != null)
         {
             centerCardDisplay.gameObject.SetActive(true);
@@ -405,9 +416,97 @@ public class GameManager : MonoBehaviour
 
         if (resultsText != null)
         {
-            resultsText.text = "<b><color=" + cardColorHex + "><size=8>" + card.cardName.ToUpper() + "</size></color></b>";
+            resultsText.text = "<b><color=" + cardColorHex + "><size=2>" + card.cardName.ToUpper() + "</size></color></b>";
         }
 
+        // [CHRONO LECTURE] On attend sagement 3 secondes que le joueur lise la carte au calme
+        yield return new WaitForSeconds(3.0f);
+
+        // --- 2. SÉQUENCE ACTION : On masque la carte et on lance l'attaque visuelle ---
+        if (target != null && target != performer)
+        {
+            // On fait disparaître la carte géante pour libérer totalement le centre de l'écran !
+            if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
+
+            // La caméra recule pour filmer toute la table
+            CameraController camCtrl = Object.FindFirstObjectByType<CameraController>();
+            if (camCtrl != null && centerTableViewPoint != null)
+            {
+                camCtrl.SetTarget(centerTableViewPoint);
+            }
+
+            yield return new WaitForSeconds(0.4f);
+            
+            GameObject prefabToSpawn = null;
+            Color projColor = Color.white;
+
+            if (card.cardName.ToLower().Contains("steal") || card.cardName.ToLower().Contains("or"))
+            {
+                prefabToSpawn = stealProjectilePrefab;
+                projColor = new Color(1f, 0.85f, 0f); // Main dorée
+            }
+            else if (card.type == CardData.CardType.Action || card.type == CardData.CardType.Special)
+            {
+                prefabToSpawn = attackProjectilePrefab;
+
+                if (card.effects.Count > 0)
+                {
+                    CardData.EffectType currentEffect = card.effects[0].effectType;
+                    switch (currentEffect)
+                    {
+                        case CardData.EffectType.Burn: projColor = new Color(1f, 0.3f, 0f); break;   // Orange
+                        case CardData.EffectType.Poison: projColor = new Color(0.2f, 1f, 0.2f); break; // Vert
+                        case CardData.EffectType.Frozen: projColor = new Color(0f, 0.7f, 1f); break;  // Bleu
+                        default: projColor = new Color(0.9f, 0.1f, 0.1f); break;                      // Rouge
+                    }
+                }
+            }
+
+            // === SYSTÈME DE TIR 3D VERROUILLÉ (MODIFIÉ ICI) ===
+            if (prefabToSpawn != null)
+            {
+                Vector3 spawnPos = performer.transform.position;
+                Vector3 targetPos = target.transform.position;
+
+                // On détecte le centre réel du modèle 3D visible (fiole/corps)
+                Renderer perfRenderer = performer.GetComponentInChildren<Renderer>();
+                if (perfRenderer != null) spawnPos = perfRenderer.bounds.center;
+
+                Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
+                if (targetRenderer != null) targetPos = targetRenderer.bounds.center;
+
+                // On instancie notre magnifique projectile 3D
+                GameObject projGO = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
+                
+                // AJOUT : On va chercher le script déjà présent sur le prefab pour garder ton Rotation Offset !
+                GhostProjectile projectileScript = projGO.GetComponent<GhostProjectile>();
+                if (projectileScript == null)
+                {
+                    projectileScript = projGO.AddComponent<GhostProjectile>();
+                }
+                
+                // On l'initialise avec la vraie position du corps adverse
+                projectileScript.Setup(targetPos, projColor);
+            }
+
+            // On attend que le projectile termine sa course
+            yield return new WaitForSeconds(0.6f);
+
+            // === NOUVEAU : DÉCLENCHEMENT DE L'ANIMATION D'IMPACT ===
+            StartCoroutine(PlayImpactJuice(target));
+
+            if (impactParticlePrefab != null)
+            {
+                Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
+                Vector3 impactPos = targetRenderer != null ? targetRenderer.bounds.center : target.transform.position;
+                
+                GameObject effectInstance = Instantiate(impactParticlePrefab, impactPos, Quaternion.identity);
+                
+                Destroy(effectInstance, 2.0f);
+            }
+        } 
+
+        // --- 3. SÉQUENCE IMPACT : On applique les effets REELS dans le jeu ---
         if (card.cardName == "Glitch" && Object.FindFirstObjectByType<HandManager>() != null)
         {
             Object.FindFirstObjectByType<HandManager>().GenerateRandomHand();
@@ -430,12 +529,6 @@ public class GameManager : MonoBehaviour
             foreach (var effect in card.effects)
             {
                 activeRules.RemoveAll(r => r.effectType == effect.effectType);
-
-                if (activeRules.Count >= 3)
-                {
-                    activeRules.RemoveAt(0);
-                }
-
                 ActiveRuleInstance newRule = new ActiveRuleInstance
                 {
                     ruleName = card.cardName,
@@ -455,7 +548,11 @@ public class GameManager : MonoBehaviour
             Object.FindFirstObjectByType<HandManager>().RefillHand();
         }
 
-        Invoke("AdvanceTurn", 3.0f);
+        // On laisse 1 seconde de pause pour que le joueur voie bien le résultat des dégâts sur les fioles
+        yield return new WaitForSeconds(1.0f);
+
+        // On passe enfin au tour suivant
+        AdvanceTurn();
     }
 
     void AdvanceTurn()
@@ -608,6 +705,76 @@ public class GameManager : MonoBehaviour
         if (dashboardController != null)
         {
             dashboardController.TriggerNewRuleAlert();
+        }
+    }
+
+    [Header("Future Assets Pack")]
+    [Tooltip("Tu glisseras ton effet de particule du Legacy Pack ici plus tard !")]
+    public GameObject impactParticlePrefab;
+
+   // === JUICE EFFECT BLINDÉ : SQUASH + JUMP (ANTI-ANIMATOR) ===
+    System.Collections.IEnumerator PlayImpactJuice(PlayerEntity target)
+    {
+        if (target == null) yield break;
+
+        // SOLUTION JURY : On cible le transform RACINE du joueur. 
+        // L'Animator des enfants ne peut pas écraser ce paramètre !
+        Transform rootTransform = target.transform;
+        
+        // On sauvegarde la position et la taille d'origine exactes
+        Vector3 originalScale = rootTransform.localScale;
+        Vector3 originalPosition = rootTransform.position;
+
+        // --- Détection de la couleur (optionnelle pour ton shader) ---
+        string colorPropName = "";
+        Renderer targetRen = target.GetComponentInChildren<Renderer>();
+        if (targetRen != null && targetRen.material != null)
+        {
+            if (targetRen.material.HasProperty("_Color")) colorPropName = "_Color";
+            else if (targetRen.material.HasProperty("_BaseColor")) colorPropName = "_BaseColor";
+        }
+
+        Color originalColor = Color.white;
+        if (!string.IsNullOrEmpty(colorPropName) && targetRen != null)
+        {
+            originalColor = targetRen.material.GetColor(colorPropName);
+            targetRen.material.SetColor(colorPropName, new Color(1f, 0.25f, 0.25f)); // Flash rouge
+        }
+
+        // --- BOUCLE DE L'ANIMATION COURIER ---
+        float duration = 0.25f; // Durée du choc (un quart de seconde, très percutant)
+        float time = 0f;
+
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            float t = time / duration;
+
+            // Crée une belle courbe en cloche (monte puis redescend proprement)
+            float wave = Mathf.Sin(t * Mathf.PI);
+            
+            // 1. EFFET SQUASH (On l'augmente à 0.4f pour que ce soit bien visible !)
+            float scaleModifier = wave * 0.4f; 
+            rootTransform.localScale = new Vector3(
+                originalScale.x + scaleModifier, // S'élargit
+                originalScale.y - scaleModifier, // S'aplatit
+                originalScale.z + scaleModifier
+            );
+
+            // 2. EFFET HOP ! (Le bot fait un bond de 0.5 unité en l'air sous l'impact)
+            float jumpHeight = wave * 0.5f;
+            rootTransform.position = originalPosition + Vector3.up * jumpHeight;
+
+            yield return null;
+        }
+
+        // --- REMISE À ZÉRO PARFAITE AU RETOUR ---
+        rootTransform.localScale = originalScale;
+        rootTransform.position = originalPosition;
+
+        if (!string.IsNullOrEmpty(colorPropName) && targetRen != null)
+        {
+            targetRen.material.SetColor(colorPropName, originalColor);
         }
     }
 }

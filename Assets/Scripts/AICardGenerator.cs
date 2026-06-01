@@ -68,7 +68,10 @@ public class AICardGenerator : MonoBehaviour
 
     IEnumerator PostBatchRequest(System.Action<List<AICardJSON>> callback)
     {
-        int[] availableEffects = { 0, 1, 2, 5, 6, 7, 8, 11, 15, 16 };
+        // === ÉTAPES DES PROBABILITÉS : TRI PAR CATÉGORIE ===
+        int[] actionEffects = { 0, 1, 2 };          // Dégâts, Soin, Vol d'or
+        int[] ruleEffects = { 15, 16 };            // Lois (Timer, Gravité)
+        int[] specialEffects = { 5, 6, 7, 8, 11 };  // États (Gel, Feu, Poison, Bouclier, Silence)
         
         int[] chosenEffects = new int[3];
         int[] forcedTypes = new int[3];
@@ -78,7 +81,22 @@ public class AICardGenerator : MonoBehaviour
 
         for (int i = 0; i < 3; i++)
         {
-            int eff = availableEffects[Random.Range(0, availableEffects.Length)];
+            float roll = Random.Range(0f, 100f);
+            int eff = 0;
+
+            if (roll < 60f)
+            {
+                eff = actionEffects[Random.Range(0, actionEffects.Length)];
+            }
+            else if (roll < 80f) 
+            {
+                eff = ruleEffects[Random.Range(0, ruleEffects.Length)];
+            }
+            else
+            {
+                eff = specialEffects[Random.Range(0, specialEffects.Length)];
+            }
+
             chosenEffects[i] = eff;
             
             if (eff == 15 || eff == 16)
