@@ -170,11 +170,13 @@ public class GameManager : MonoBehaviour
         selectedCard = null;
         selectedTarget = null;
 
-        if (!activePlayer.isBot)
+       if (!activePlayer.isBot)
         {
             if (resolutionPanel != null) resolutionPanel.SetActive(true);
             isResolutionPhase = true;
             if (resultsText != null) resultsText.text = "<size=100><b>YOUR TURN</b></size>";
+            
+            if (playerHandUI != null) playerHandUI.SetActive(false); 
             
             Invoke("InitializeHumanTurnVisuals", 2.0f);
         }
@@ -190,14 +192,13 @@ public class GameManager : MonoBehaviour
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         isResolutionPhase = false;
 
-        if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
-
-        if (playerHandUI != null) playerHandUI.SetActive(true);
+        // On affiche enfin le deck au moment où le texte s'en va !
+        if (playerHandUI != null) playerHandUI.SetActive(true); 
         
         HandManager hm = Object.FindFirstObjectByType<HandManager>();
         if (hm != null)
         {
-            hm.ResetAllCardsVisuals();
+            hm.AnimateSideSlide(); 
         }
 
         timeLeft = nextRoundTimerDuration;
@@ -434,7 +435,7 @@ public class GameManager : MonoBehaviour
                 {
                     activeRules.RemoveAt(0);
                 }
-                
+
                 ActiveRuleInstance newRule = new ActiveRuleInstance
                 {
                     ruleName = card.cardName,

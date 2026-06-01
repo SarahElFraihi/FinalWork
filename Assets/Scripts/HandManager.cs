@@ -83,4 +83,62 @@ public class HandManager : MonoBehaviour
             else { slot.SetVisualState(true); slot.SetYOffset(-40f); }
         }
     }
+
+    public void AnimateSideSlide()
+    {
+        StartCoroutine(SideSlideRoutine());
+    }
+
+    System.Collections.IEnumerator SideSlideRoutine()
+    {
+        // 1. On décale d'abord toutes les cartes sur le côté gauche et invisibles
+        foreach (CardDisplay slot in cardSlots)
+        {
+            if (slot != null && slot.visualContent != null)
+            {
+                slot.visualContent.anchoredPosition = new Vector2(-400f, 0f); 
+                slot.visualContent.localScale = Vector3.zero; 
+            }
+        }
+
+        // 2. On les fait défiler l'une après l'autre de gauche à droite
+        foreach (CardDisplay slot in cardSlots)
+        {
+            if (slot != null && slot.visualContent != null)
+            {
+                slot.SetVisualState(false);
+                StartCoroutine(SmoothSideSlideCard(slot));
+                
+                // Petit délai pour l'effet cascade/défilement
+                yield return new WaitForSeconds(0.1f); 
+            }
+        }
+    }
+
+    System.Collections.IEnumerator SmoothSideSlideCard(CardDisplay slot)
+    {
+        float time = 0f;
+        float duration = 0.4f;
+
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            float t = time / duration;
+            t = Mathf.Sin(t * Mathf.PI * 0.5f); 
+
+            if (slot != null && slot.visualContent != null)
+            {
+                // Glisse horizontale de -400 à 0
+                slot.visualContent.anchoredPosition = new Vector2(Mathf.Lerp(-400f, 0f, t), 0f);
+                slot.visualContent.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, t);
+            }
+            yield return null;
+        }
+
+        if (slot != null && slot.visualContent != null)
+        {
+            slot.visualContent.anchoredPosition = Vector2.zero;
+            slot.visualContent.localScale = Vector3.one;
+        }
+    }
 }

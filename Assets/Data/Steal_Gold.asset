@@ -16,7 +16,8 @@ MonoBehaviour:
   description: Steal resources from a targeted player.
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
-  duration: 0
-  effectValue: 0
+  effects:
+  - effectType: 2
+    value: 3
   requiresTarget: 1
   targetMode: 1
