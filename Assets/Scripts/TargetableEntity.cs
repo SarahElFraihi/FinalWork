@@ -14,6 +14,9 @@ public class TargetableEntity : MonoBehaviour
 
     void OnMouseDown()
     {
+        // SECURITÉ ANTI-CADAVRE : Si le bot est mort, on refuse de le cibler !
+        if (associatedEntity != null && associatedEntity.isDead) return;
+
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
         
         if (gm != null && gm.selectedCard != null)

@@ -146,7 +146,7 @@ public class HandManager : MonoBehaviour
 
         float roll = Random.Range(0f, 100f);
 
-        if (roll < 60f && actionCards.Count > 0)
+        if (roll < 69f && actionCards.Count > 0)
             return actionCards[Random.Range(0, actionCards.Count)];
         
         else if (roll < 80f && ruleCards.Count > 0)

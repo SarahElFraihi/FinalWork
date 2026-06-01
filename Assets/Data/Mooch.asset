@@ -18,9 +18,9 @@ MonoBehaviour:
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
   effects:
+  - effectType: 16
+    value: 1
   - effectType: 0
-    value: 5
-  - effectType: 0
-    value: 5
+    value: 50
   requiresTarget: 1
   targetMode: 1

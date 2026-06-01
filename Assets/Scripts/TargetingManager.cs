@@ -34,15 +34,53 @@ public class TargetingManager : MonoBehaviour
     {
         if (!isTargeting || isLocked) return;
 
+        // 1. Détection initiale selon la position de la souris
         if (Input.mousePosition.x < Screen.width * 0.33f) currentTargetIndex = 0; 
         else if (Input.mousePosition.x > Screen.width * 0.66f) currentTargetIndex = 2; 
         else currentTargetIndex = 1; 
 
+        // 2. === NOUVEAU : REDIRECTION INTERNE SI LA CIBLE EST MORTE ===
+        RedirectIfTargetIsDead();
+
+        // 3. Mise à jour visuelle de la flèche
         UpdateArrowPosition();
 
         if (Input.GetMouseButtonDown(0))
         {
             LockTarget();
+        }
+    }
+
+    private void RedirectIfTargetIsDead()
+    {
+        if (playerTargets == null || playerTargets.Count == 0) return;
+
+        // Petite fonction locale pour vérifier rapidement si un index est mort
+        System.Func<int, bool> IsDead = (index) =>
+        {
+            if (index < 0 || index >= playerTargets.Count || playerTargets[index] == null) return true;
+            PlayerEntity pe = playerTargets[index].GetComponent<PlayerEntity>();
+            if (pe == null) pe = playerTargets[index].GetComponentInParent<PlayerEntity>();
+            return pe != null && pe.isDead;
+        };
+
+        // RÈGLE : Si on vise Gauche (0) et qu'il est mort -> Go Milieu (1)
+        if (currentTargetIndex == 0 && IsDead(0))
+        {
+            if (!IsDead(1)) currentTargetIndex = 1;
+            else if (!IsDead(2)) currentTargetIndex = 2; // Sécurité : Si le milieu est mort aussi, go Droite
+        }
+        // RÈGLE : Si on vise Droite (2) et qu'il est mort -> Go Milieu (1)
+        else if (currentTargetIndex == 2 && IsDead(2))
+        {
+            if (!IsDead(1)) currentTargetIndex = 1;
+            else if (!IsDead(0)) currentTargetIndex = 0; // Sécurité : Si le milieu est mort aussi, go Gauche
+        }
+        // RÈGLE : Si on vise le Milieu (1) mais qu'il est mort -> On cherche qui est vivant
+        else if (currentTargetIndex == 1 && IsDead(1))
+        {
+            if (!IsDead(0)) currentTargetIndex = 0;
+            else if (!IsDead(2)) currentTargetIndex = 2;
         }
     }
 

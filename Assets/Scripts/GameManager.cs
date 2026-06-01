@@ -49,6 +49,7 @@ public class GameManager : MonoBehaviour
     [Header("Visual Effects")]
     public GameObject attackProjectilePrefab;
     public GameObject stealProjectilePrefab;  
+    public GameObject deathParticlePrefab;
 
     [Header("Compatibility Fields")]
     public bool isResolutionPhase = false;
@@ -425,6 +426,12 @@ public class GameManager : MonoBehaviour
         // --- 2. SÉQUENCE ACTION : On masque la carte et on lance l'attaque visuelle ---
         if (target != null && target != performer)
         {
+            // === NOUVEAU : REDIRECTION AUTOMATIQUE SI LA CIBLE EST MORTE ===
+            if (target.isDead)
+            {
+                target = GetRedirectedTarget(target);
+            }
+
             // On fait disparaître la carte géante pour libérer totalement le centre de l'écran !
             if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
 
@@ -440,10 +447,15 @@ public class GameManager : MonoBehaviour
             GameObject prefabToSpawn = null;
             Color projColor = Color.white;
 
-            if (card.cardName.ToLower().Contains("steal") || card.cardName.ToLower().Contains("or"))
+            bool structureContientDeLor = card.effects.Exists(e => e.effectType == CardData.EffectType.Gold);
+
+            if (structureContientDeLor || 
+                card.cardName.ToLower().Contains("steal") || 
+                card.cardName.ToLower().Contains("or") || 
+                card.cardName.ToLower().Contains("money"))
             {
                 prefabToSpawn = stealProjectilePrefab;
-                projColor = new Color(1f, 0.85f, 0f); // Main dorée
+                projColor = new Color(1f, 0.85f, 0f);
             }
             else if (card.type == CardData.CardType.Action || card.type == CardData.CardType.Special)
             {
@@ -491,6 +503,8 @@ public class GameManager : MonoBehaviour
 
             // On attend que le projectile termine sa course
             yield return new WaitForSeconds(0.6f);
+
+            yield return StartCoroutine(PlayImpactJuice(target));
 
             // === NOUVEAU : DÉCLENCHEMENT DE L'ANIMATION D'IMPACT ===
             StartCoroutine(PlayImpactJuice(target));
@@ -584,9 +598,31 @@ public class GameManager : MonoBehaviour
                 int dmg = Mathf.Abs((int)effect.value);
                 if (activeRules.Exists(r => r.effectType == CardData.EffectType.Heal)) target.TakeDamage(dmg);
                 else target.TakeDamage(-dmg);
+                
+                // 1. On applique l'assombrissement progressif
+                UpdatePlayerVisualDarkness(target);
+
+                // 2. === EXPLOSION ===
+                if (target.isDead)
+                {
+                    if (deathParticlePrefab != null)
+                    {
+                        Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
+                        Vector3 deathPos = targetRenderer != null ? targetRenderer.bounds.center : target.transform.position;
+                        
+                        GameObject deathFX = Instantiate(deathParticlePrefab, deathPos, Quaternion.identity);
+                        Destroy(deathFX, 3.0f); 
+                    }
+
+                    if (target.GetComponentInChildren<Renderer>() != null)
+                    {
+                        target.GetComponentInChildren<Renderer>().gameObject.SetActive(false);
+                    }
+                }
                 break;
             case CardData.EffectType.Heal: 
                 target.TakeDamage(Mathf.Abs((int)effect.value)); 
+                UpdatePlayerVisualDarkness(target);
                 break;
             case CardData.EffectType.Gold: 
                 int goldAmount = Mathf.Abs((int)effect.value);
@@ -679,6 +715,25 @@ public class GameManager : MonoBehaviour
             {
                 if (p.isPoisoned || globalPoison) p.TakeDamage(-5);
                 if (p.isOnFire || globalBurn) p.TakeDamage(-10);
+
+                // On actualise son visuel après les dégâts passifs
+                UpdatePlayerVisualDarkness(p);
+
+                // Si le poison ou le feu l'a achevé, il explose !
+                if (p.isDead)
+                {
+                    if (deathParticlePrefab != null)
+                    {
+                        Renderer targetRenderer = p.GetComponentInChildren<Renderer>();
+                        Vector3 deathPos = targetRenderer != null ? targetRenderer.bounds.center : p.transform.position;
+                        GameObject deathFX = Instantiate(deathParticlePrefab, deathPos, Quaternion.identity);
+                        Destroy(deathFX, 3.0f);
+                    }
+                    if (p.GetComponentInChildren<Renderer>() != null)
+                    {
+                        p.GetComponentInChildren<Renderer>().gameObject.SetActive(false);
+                    }
+                }
             }
         }
         UpdateGoldUI();
@@ -712,69 +767,121 @@ public class GameManager : MonoBehaviour
     [Tooltip("Tu glisseras ton effet de particule du Legacy Pack ici plus tard !")]
     public GameObject impactParticlePrefab;
 
-   // === JUICE EFFECT BLINDÉ : SQUASH + JUMP (ANTI-ANIMATOR) ===
+   // === JUICE EFFECT CORRIGÉ (CORPS + YEUX FLASHENT EN ENTIER) ===
     System.Collections.IEnumerator PlayImpactJuice(PlayerEntity target)
     {
         if (target == null) yield break;
 
-        // SOLUTION JURY : On cible le transform RACINE du joueur. 
-        // L'Animator des enfants ne peut pas écraser ce paramètre !
         Transform rootTransform = target.transform;
-        
-        // On sauvegarde la position et la taille d'origine exactes
         Vector3 originalScale = rootTransform.localScale;
         Vector3 originalPosition = rootTransform.position;
 
-        // --- Détection de la couleur (optionnelle pour ton shader) ---
-        string colorPropName = "";
-        Renderer targetRen = target.GetComponentInChildren<Renderer>();
-        if (targetRen != null && targetRen.material != null)
+        Renderer[] allRenderers = target.GetComponentsInChildren<Renderer>();
+
+        // 1. FLASH ROUGE SUR TOUS LES MORCEAUX (Corps + Yeux !)
+        if (allRenderers != null)
         {
-            if (targetRen.material.HasProperty("_Color")) colorPropName = "_Color";
-            else if (targetRen.material.HasProperty("_BaseColor")) colorPropName = "_BaseColor";
+            foreach (Renderer ren in allRenderers)
+            {
+                if (ren == null || ren.material == null) continue;
+                
+                string colorPropName = "";
+                if (ren.material.HasProperty("_Color")) colorPropName = "_Color";
+                else if (ren.material.HasProperty("_BaseColor")) colorPropName = "_BaseColor";
+
+                if (!string.IsNullOrEmpty(colorPropName))
+                {
+                    ren.material.SetColor(colorPropName, new Color(1f, 0.25f, 0.25f)); 
+                }
+            }
         }
 
-        Color originalColor = Color.white;
-        if (!string.IsNullOrEmpty(colorPropName) && targetRen != null)
-        {
-            originalColor = targetRen.material.GetColor(colorPropName);
-            targetRen.material.SetColor(colorPropName, new Color(1f, 0.25f, 0.25f)); // Flash rouge
-        }
-
-        // --- BOUCLE DE L'ANIMATION COURIER ---
-        float duration = 0.25f; // Durée du choc (un quart de seconde, très percutant)
+        // 2. BOUCLE DE REBOND PHYSICS
+        float duration = 0.25f;
         float time = 0f;
-
         while (time < duration)
         {
             time += Time.deltaTime;
             float t = time / duration;
-
-            // Crée une belle courbe en cloche (monte puis redescend proprement)
             float wave = Mathf.Sin(t * Mathf.PI);
             
-            // 1. EFFET SQUASH (On l'augmente à 0.4f pour que ce soit bien visible !)
             float scaleModifier = wave * 0.4f; 
-            rootTransform.localScale = new Vector3(
-                originalScale.x + scaleModifier, // S'élargit
-                originalScale.y - scaleModifier, // S'aplatit
-                originalScale.z + scaleModifier
-            );
-
-            // 2. EFFET HOP ! (Le bot fait un bond de 0.5 unité en l'air sous l'impact)
-            float jumpHeight = wave * 0.5f;
-            rootTransform.position = originalPosition + Vector3.up * jumpHeight;
+            rootTransform.localScale = new Vector3(originalScale.x + scaleModifier, originalScale.y - scaleModifier, originalScale.z + scaleModifier);
+            rootTransform.position = originalPosition + Vector3.up * (wave * 0.5f);
 
             yield return null;
         }
 
-        // --- REMISE À ZÉRO PARFAITE AU RETOUR ---
+        // 3. REMISE À ZÉRO PHYSIQUE
         rootTransform.localScale = originalScale;
         rootTransform.position = originalPosition;
 
-        if (!string.IsNullOrEmpty(colorPropName) && targetRen != null)
+        // Recalcule la couleur sombre finale sur TOUT le monde d'un coup
+        UpdatePlayerVisualDarkness(target);
+    }
+
+   // === SYSTÈME DE DAMAGE VISUEL CORRIGÉ (CORPS + YEUX) ===
+    public void UpdatePlayerVisualDarkness(PlayerEntity target)
+    {
+        if (target == null) return;
+
+        // NOUVEAU : On récupère TOUS les Renderers (Corps, Yeux, Accessoires...)
+        Renderer[] allRenderers = target.GetComponentsInChildren<Renderer>();
+        if (allRenderers == null || allRenderers.Length == 0) return;
+
+        float healthRatio = (float)target.currentHealth / target.maxHealth;
+
+        // Calibrage sur ton gris #6C6C6C (0.42f)
+        float maxBrightness = 108f / 255f; 
+        float minBrightness = 0.05f; 
+
+        float brightness = Mathf.Lerp(minBrightness, maxBrightness, healthRatio);
+        Color healthColor = new Color(brightness, brightness, brightness, 1f);
+
+        // On applique la couleur sur CHAQUE morceau trouvé
+        foreach (Renderer ren in allRenderers)
         {
-            targetRen.material.SetColor(colorPropName, originalColor);
+            if (ren == null || ren.material == null) continue;
+
+            string colorPropName = "";
+            if (ren.material.HasProperty("_Color")) colorPropName = "_Color";
+            else if (ren.material.HasProperty("_BaseColor")) colorPropName = "_BaseColor";
+
+            if (!string.IsNullOrEmpty(colorPropName))
+            {
+                ren.material.SetColor(colorPropName, healthColor);
+            }
         }
+    }
+
+    // === CALCUL DES POSITIONS ET REDIRECTION DES CIBLES ===
+    private PlayerEntity GetRedirectedTarget(PlayerEntity deadTarget)
+    {
+        if (botEntities == null || botEntities.Count == 0) return deadTarget;
+
+        // On crée une copie de la liste des bots et on les trie par leur position X dans le monde 3D
+        // (Le plus petit X = Gauche, le X du milieu = Milieu, le plus grand X = Droite)
+        List<PlayerEntity> sortedBots = new List<PlayerEntity>(botEntities);
+        sortedBots.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+
+        PlayerEntity leftBot = sortedBots.Count > 0 ? sortedBots[0] : null;
+        PlayerEntity middleBot = sortedBots.Count > 1 ? sortedBots[1] : null;
+        PlayerEntity rightBot = sortedBots.Count > 2 ? sortedBots[2] : null;
+
+        // RÈGLE : Si la cible morte est à GAUCHE ou à DROITE, on redirige vers le MILIEU (s'il est en vie)
+        if ((deadTarget == leftBot || deadTarget == rightBot) && middleBot != null && !middleBot.isDead)
+        {
+            Debug.Log($"[REDIRECTION] {deadTarget.playerName} est mort ! L'attaque est redirigée sur le milieu : {middleBot.playerName}");
+            return middleBot;
+        }
+
+        // SÉCURITÉ ULTIME : Si le milieu est mort aussi, on cherche le premier bot vivant disponible
+        foreach (PlayerEntity bot in sortedBots)
+        {
+            if (bot != null && !bot.isDead) return bot;
+        }
+
+        // Si vraiment TOUS les bots sont morts, on renvoie la cible d'origine par sécurité
+        return deadTarget;
     }
 }
