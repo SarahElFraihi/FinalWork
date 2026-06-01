@@ -37,6 +37,7 @@ public class PlayerEntity : MonoBehaviour
     public PlayerEntity leftNeighbor;
     public PlayerEntity rightNeighbor;
     public PlayerEntity oppositePlayer;
+    public Transform cameraViewPoint;
 
     [Header("Couleurs de la Fiole")]
     public Color fullHealthColor = Color.red; // Ta belle couleur de base

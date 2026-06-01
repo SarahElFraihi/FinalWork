@@ -9,7 +9,7 @@ public class CardDisplay : MonoBehaviour
     [Header("UI Images References")]
     public Image colorOutline; 
     public Image iconDisplay;  
-    public RectTransform visualContent; // L'objet qui va bouger
+    public RectTransform visualContent; 
 
     [Header("Icons Sprites")]
     public Sprite actionSprite;
@@ -31,7 +31,6 @@ public class CardDisplay : MonoBehaviour
         colorOutline.color = cardData.cardColor;
         iconDisplay.color = cardData.cardColor;
 
-        // LOGIQUE ESSENTIELLE : Choix de l'icône
         switch (cardData.type)
         {
             case CardData.CardType.Action: iconDisplay.sprite = actionSprite; break;
@@ -44,7 +43,6 @@ public class CardDisplay : MonoBehaviour
     {
         if (visualContent != null)
         {
-            // On déplace le contenu localement pour ne pas casser le Layout
             visualContent.anchoredPosition = new Vector2(0, yOffset);
         }
     }
@@ -63,19 +61,18 @@ public class CardDisplay : MonoBehaviour
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
         TargetingManager tm = Object.FindFirstObjectByType<TargetingManager>();
 
-        if (gm != null && !gm.isResolutionPhase)
+        if (gm != null)
         {
             if (hm != null) hm.HighlightSelectedCard(this);
             gm.SelectCard(cardData);
 
-            // Si la carte a besoin d'une cible, on lance le ciblage !
             if (cardData.requiresTarget && tm != null)
             {
                 tm.StartTargeting();
             }
             else if (tm != null)
             {
-                tm.ResetArrow(); // Cache la flèche si la carte n'en a pas besoin
+                tm.ResetArrow();
             }
         }
     }
