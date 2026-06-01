@@ -22,6 +22,7 @@ public class GameManager : MonoBehaviour
     public RulesDashboardUI dashboardController;
     public GameObject validateTurnButton;
     public GameObject playerHandUI;
+    public CardDisplay centerCardDisplay;
 
     [Header("Timer Settings")]
     public float timeLeft = 15f; 
@@ -131,6 +132,8 @@ public class GameManager : MonoBehaviour
 
         if (validateTurnButton != null) validateTurnButton.SetActive(false);
         
+        if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
+
         timerRunning = false;
         UpdateTimerUI();
 
@@ -186,6 +189,8 @@ public class GameManager : MonoBehaviour
     {
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         isResolutionPhase = false;
+
+        if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
 
         if (playerHandUI != null) playerHandUI.SetActive(true);
         
@@ -327,6 +332,8 @@ public class GameManager : MonoBehaviour
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         isResolutionPhase = false;
 
+        if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
+
         timeLeft = Random.Range(2.0f, 3.5f);
         timerRunning = true;
         UpdateTimerUI();
@@ -377,14 +384,27 @@ public class GameManager : MonoBehaviour
         isResolutionPhase = true;
         timerRunning = false;
         UpdateTimerUI();
+
+        if (centerCardDisplay != null)
+        {
+            centerCardDisplay.gameObject.SetActive(true);
+            centerCardDisplay.LoadCard(card); 
+            centerCardDisplay.SetVisualState(false);
+            centerCardDisplay.SetYOffset(0);
+        }
         
+        if (!performer.isBot && playerHandUI != null)
+        {
+            playerHandUI.SetActive(false);
+        }
+
         string cardColorHex = "#E61A1A"; 
         if (card.type == CardData.CardType.Rule) cardColorHex = "#FFD700";
         else if (card.type == CardData.CardType.Special) cardColorHex = "#991AE6";
 
         if (resultsText != null)
         {
-            resultsText.text = "<size=30>" + performer.playerName + " play's :</size>\n<b><color=" + cardColorHex + "><size=80>" + card.cardName.ToUpper() + "</size></color></b>";
+            resultsText.text = "<b><color=" + cardColorHex + "><size=8>" + card.cardName.ToUpper() + "</size></color></b>";
         }
 
         if (card.cardName == "Glitch" && Object.FindFirstObjectByType<HandManager>() != null)
@@ -409,6 +429,12 @@ public class GameManager : MonoBehaviour
             foreach (var effect in card.effects)
             {
                 activeRules.RemoveAll(r => r.effectType == effect.effectType);
+
+                if (activeRules.Count >= 3)
+                {
+                    activeRules.RemoveAt(0);
+                }
+                
                 ActiveRuleInstance newRule = new ActiveRuleInstance
                 {
                     ruleName = card.cardName,
@@ -428,7 +454,7 @@ public class GameManager : MonoBehaviour
             Object.FindFirstObjectByType<HandManager>().RefillHand();
         }
 
-        Invoke("AdvanceTurn", 2.5f);
+        Invoke("AdvanceTurn", 3.0f);
     }
 
     void AdvanceTurn()
@@ -578,7 +604,7 @@ public class GameManager : MonoBehaviour
         }
         activeRulesText.text = textBuffer; 
 
-        if (dashboardController != null && timerRunning)
+        if (dashboardController != null)
         {
             dashboardController.TriggerNewRuleAlert();
         }

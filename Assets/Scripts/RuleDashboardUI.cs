@@ -12,8 +12,8 @@ public class RulesDashboardUI : MonoBehaviour
 
     [Header("Flèche de Notification")]
     public RectTransform alertArrowRect; 
-    public float wiggleSpeed = 15f;
-    public float wiggleAmount = 10f;
+    public float wiggleSpeed = 15f; 
+    public float wiggleAmount = 15f;  
     private bool hasNewRuleAlert = false;
     private Vector2 arrowOriginalPosition;
 
@@ -36,6 +36,10 @@ public class RulesDashboardUI : MonoBehaviour
             float offsetX = Mathf.Sin(Time.time * wiggleSpeed) * wiggleAmount;
             alertArrowRect.anchoredPosition = new Vector2(arrowOriginalPosition.x + offsetX, arrowOriginalPosition.y);
         }
+        else if (alertArrowRect != null)
+        {
+            alertArrowRect.anchoredPosition = arrowOriginalPosition;
+        }
 
         if (alertArrowRect != null)
         {
@@ -55,7 +59,6 @@ public class RulesDashboardUI : MonoBehaviour
         if (isOpen)
         {
             hasNewRuleAlert = false;
-            if (alertArrowRect != null) alertArrowRect.anchoredPosition = arrowOriginalPosition;
         }
     }
 
