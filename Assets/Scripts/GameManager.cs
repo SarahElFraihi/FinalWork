@@ -9,6 +9,7 @@ public class ActiveRuleInstance
     public string ruleDescription; 
     public CardData.EffectType effectType;
     public float value;
+    public int turnsRemaining = 2;
 }
 
 public class GameManager : MonoBehaviour
@@ -25,6 +26,13 @@ public class GameManager : MonoBehaviour
     public CardDisplay centerCardDisplay;
     public Transform centerTableViewPoint;
 
+    [Header("Timer Juice Settings")]
+    private int lastSecondTicked = -1;
+    private float timerPulseScale = 0f;
+    private Vector2 timerOriginalPos;
+    private Vector3 timerOriginalScale;
+    private bool timerVisualsInitialized = false;
+
     [Header("Timer Settings")]
     public float timeLeft = 15f; 
     public bool timerRunning = false;
@@ -37,6 +45,7 @@ public class GameManager : MonoBehaviour
 
     [Header("Selections")]
     public CardData selectedCard; 
+    private CardData lastPlayedCard;
     public PlayerEntity selectedTarget;
 
     [Header("Entities & Turn System")]
@@ -49,7 +58,11 @@ public class GameManager : MonoBehaviour
     [Header("Visual Effects")]
     public GameObject attackProjectilePrefab;
     public GameObject stealProjectilePrefab;  
+    public GameObject healProjectilePrefab;
     public GameObject deathParticlePrefab;
+    public GameObject damageImpactPrefab;
+    public GameObject stealImpactPrefab;   
+    public GameObject healImpactPrefab;
 
     [Header("Compatibility Fields")]
     public bool isResolutionPhase = false;
@@ -89,22 +102,93 @@ public class GameManager : MonoBehaviour
         StartNewRound();
     }
 
-    void Update()
+   void Update()
     {
         if (timerRunning)
         {
+            // Initialisation unique des positions d'origine de ton texte
+            if (!timerVisualsInitialized && timerText != null)
+            {
+                timerOriginalPos = timerText.rectTransform.anchoredPosition;
+                timerOriginalScale = timerText.rectTransform.localScale;
+                timerVisualsInitialized = true;
+            }
+
             if (timeLeft > 0)
             {
                 timeLeft -= Time.deltaTime;
-                UpdateTimerUI();
+                UpdateTimerUI(); // Met à jour le chiffre affiché (ex: "5")
+
+                // --- SYSTEME DE JUICE DU TIMER ---
+                if (timerText != null)
+                {
+                    // 1. Détection du changement de seconde pour le battement (Pop)
+                    int currentSecond = Mathf.CeilToInt(timeLeft);
+                    if (currentSecond != lastSecondTicked)
+                    {
+                        lastSecondTicked = currentSecond;
+                        timerPulseScale = 1f; // On recharge l'impulsion à fond
+                    }
+
+                    // Dissipation progressive de l'impulsion (effet ressort)
+                    timerPulseScale = Mathf.MoveTowards(timerPulseScale, 0f, Time.deltaTime * 5f);
+
+                    // 2. Calcul du taux de stress (0 = calme, 1 = panique totale à 0 seconde)
+                    float stressProgress = 0f;
+                    if (timeLeft <= 5f)
+                    {
+                        stressProgress = 1f - (timeLeft / 5f); // Évolue de 0 à 1 en 5 secondes
+                    }
+
+                    // 3. Application de la COULEUR (Blanc -> Orange -> Rouge de plus en plus sombre)
+                    if (timeLeft > 5f)
+                    {
+                        timerText.color = Color.white;
+                    }
+                    else
+                    {
+                        timerText.color = Color.Lerp(new Color(1f, 0.6f, 0f), Color.red, stressProgress);
+                    }
+
+                    // 4. Application de la TAILLE (Pulse de la seconde + Grossissement continu du stress)
+                    float bonusScale = (timerPulseScale * 0.35f) + (stressProgress * 0.5f);
+                    timerText.rectTransform.localScale = timerOriginalScale * (1f + bonusScale);
+
+                    // 5. Application du TREMBLEMENT (Shake qui s'intensifie sous les 5 secondes)
+                    if (timeLeft <= 5f)
+                    {
+                        float shakeIntensity = stressProgress * 12f; // Tremble jusqu'à 12 pixels de décalage max
+                        float randomX = Random.Range(-1f, 1f) * shakeIntensity;
+                        float randomY = Random.Range(-1f, 1f) * shakeIntensity;
+                        timerText.rectTransform.anchoredPosition = timerOriginalPos + new Vector2(randomX, randomY);
+                    }
+                    else
+                    {
+                        timerText.rectTransform.anchoredPosition = timerOriginalPos;
+                    }
+                }
             }
             else
             {
                 timeLeft = 0;
                 timerRunning = false;
+
+                // Remise à zéro propre des transformations mécaniques avant le Time Out
+                if (timerText != null)
+                {
+                    timerText.rectTransform.localScale = timerOriginalScale;
+                    timerText.rectTransform.anchoredPosition = timerOriginalPos;
+                    timerText.color = Color.white;
+                }
+
                 UpdateTimerUI();
-                HandleTimeOut();
+                HandleTimeOut(); // Lance l'affichage de fin de tour
             }
+        }
+        else
+        {
+            // Reset du tick dès que le chrono s'arrête pour être prêt au prochain tour
+            lastSecondTicked = -1;
         }
     }
 
@@ -178,13 +262,8 @@ public class GameManager : MonoBehaviour
 
        if (!activePlayer.isBot)
         {
-            if (resolutionPanel != null) resolutionPanel.SetActive(true);
-            isResolutionPhase = true;
-            if (resultsText != null) resultsText.text = "<size=100><b>YOUR TURN</b></size>";
-            
-            if (playerHandUI != null) playerHandUI.SetActive(false); 
-            
-            Invoke("InitializeHumanTurnVisuals", 2.0f);
+            // === NOUVEAU : On lance notre routine d'animation à la place du vieux Invoke ===
+            StartCoroutine(PlayYourTurnVisualRoutine());
         }
         else
         {
@@ -233,19 +312,74 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // === 1. DÉCLENCHEMENT DE L'EXPLOSION DU TIME OUT ===
+    // === 1. DÉCLENCHEMENT DU TIME OUT SANS EXPLOSION ===
     void HandleTimeOut()
     {
         PlayerEntity activePlayer = turnOrder[currentTurnIndex];
         if (activePlayer.isBot) return; 
 
+        // On lance la routine visuelle épurée
+        StartCoroutine(TimeOutVisualRoutine());
+    }
+
+    // === 2. LA MISE EN SCÈNE DU TEXTE (SLAM + SHAKE EN DIRECT) ===
+    System.Collections.IEnumerator TimeOutVisualRoutine()
+    {
         if (validateTurnButton != null) validateTurnButton.SetActive(false);
         timerRunning = false;
         UpdateTimerUI();
 
+        // --- ÉTAPE A : LE TEXTE APPARAÎT GÉANT EN DIRECT (Slam Effect) ---
         if (resultsText != null) resultsText.text = "<size=80><b>TIME OUT!</b></size>";
         if (resolutionPanel != null) resolutionPanel.SetActive(true);
         isResolutionPhase = true;
-        Invoke("AdvanceTurn", 2.0f);
+
+        RectTransform textRect = resultsText.rectTransform;
+        Vector3 finalScale = Vector3.one;
+        
+        // Le texte commence 4 fois plus gros pour simuler un impact visuel projeté
+        textRect.localScale = finalScale * 4f; 
+
+        float slamDuration = 0.15f; // Très rapide et percutant
+        float time = 0f;
+        while (time < slamDuration)
+        {
+            time += Time.deltaTime;
+            float t = time / slamDuration;
+            
+            // Le texte se rétracte à toute vitesse vers sa taille normale
+            textRect.localScale = Vector3.Lerp(finalScale * 4f, finalScale, t);
+            yield return null;
+        }
+        textRect.localScale = finalScale;
+
+        // --- ÉTAPE B : L'ONDE DE CHOC (Le texte vibre) ---
+        Vector2 originalAnchoredPos = textRect.anchoredPosition;
+        float shakeDuration = 0.35f; 
+        time = 0f;
+        
+        while (time < shakeDuration)
+        {
+            time += Time.deltaTime;
+            float t = time / shakeDuration;
+            
+            // L'intensité du tremblement diminue au fil des frames
+            float intensity = (1f - t) * 35f; 
+            float randomX = Random.Range(-1f, 1f) * intensity;
+            float randomY = Random.Range(-1f, 1f) * intensity;
+            
+            textRect.anchoredPosition = originalAnchoredPos + new Vector2(randomX, randomY);
+            yield return null;
+        }
+        // Remise en place parfaite
+        textRect.anchoredPosition = originalAnchoredPos;
+
+        // --- ÉTAPE C : PAUSE ET PASSAGE AU TOUR SUIVANT ---
+        // On laisse le panneau affiché pendant 1.5 seconde pour que le joueur digère son retard
+        yield return new WaitForSeconds(1.5f);
+
+        AdvanceTurn();
     }
 
     public void SelectCard(CardData data)
@@ -328,27 +462,72 @@ public class GameManager : MonoBehaviour
         ExecuteCardAction(turnOrder[currentTurnIndex], selectedCard, selectedTarget);
     }
 
+    // === ANIMATION IDENTIQUE ET ACCÉLÉRÉE POUR LE TOUR DES BOTS ===
     System.Collections.IEnumerator BotTurnRoutine(PlayerEntity bot)
     {
         if (resolutionPanel != null) resolutionPanel.SetActive(true);
         isResolutionPhase = true;
-        if (resultsText != null) resultsText.text = "<size=80><b>" + bot.playerName.ToUpper() + "'S TURN</b></size>";
-        yield return new WaitForSeconds(1.0f);
+
+        if (resultsText != null)
+        {
+            resultsText.text = bot.playerName.ToUpper() + "'S TURN";
+            RectTransform textRect = resultsText.rectTransform;
+
+            // Strictement le même effet soft de 1 seconde pour une cohérence parfaite
+            textRect.localScale = new Vector3(0.7f, 0.7f, 1f);
+            
+            float duration = 1.0f; 
+            float time = 0f;
+            while (time < duration)
+            {
+                time += Time.deltaTime;
+                float t = time / duration;
+
+                if (t < 0.2f)
+                {
+                    float scaleT = t / 0.2f;
+                    textRect.localScale = Vector3.Lerp(new Vector3(0.7f, 0.7f, 1f), Vector3.one, Mathf.Sin(scaleT * Mathf.PI * 0.5f));
+                }
+                else
+                {
+                    textRect.localScale = Vector3.one;
+                }
+                yield return null;
+            }
+            textRect.localScale = Vector3.one;
+        }
+        else
+        {
+            yield return new WaitForSeconds(1.0f);
+        }
 
         if (resolutionPanel != null) resolutionPanel.SetActive(false);
         isResolutionPhase = false;
 
         if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
 
-        timeLeft = Random.Range(2.0f, 3.5f);
+        // === ⏱️ UNIFICATION DU TIMER (MÊME QUE LE JOUEUR) ===
+        // On donne exactement la même durée initiale au bot
+        timeLeft = nextRoundTimerDuration; 
         timerRunning = true;
         UpdateTimerUI();
 
-        yield return new WaitUntil(() => timeLeft <= 0);
+        // === 🤔 SIMULATION DU TEMPS DE RÉFLEXION (3 À 5 SECONDES) ===
+        float botThinkingTime = Random.Range(3.0f, 5.0f);
+        float elapsed = 0f;
 
+        // Le bot réfléchit tant que son temps n'est pas écoulé ET que le chrono global n'est pas à 0
+        while (elapsed < botThinkingTime && timeLeft > 0)
+        {
+            elapsed += Time.deltaTime;
+            yield return null; // On attend frame par frame pour laisser l'Update() faire descendre le temps
+        }
+
+        // Le bot a fait son choix, on coupe le chrono (comme un joueur qui valide son tour)
         timerRunning = false;
         UpdateTimerUI();
 
+        // === EXÉCUTION DE L'ACTION DU BOT ===
         BotBrain brain = bot.GetComponent<BotBrain>();
         CardData botCard = (brain != null) ? brain.ChooseCard() : null;
 
@@ -360,7 +539,7 @@ public class GameManager : MonoBehaviour
                 isResolutionPhase = true;
                 if (resultsText != null) resultsText.text = "<size=60><b>" + bot.playerName + " IS SILENCED!</b></size>";
                 bot.isSilenced = false;
-                yield return new WaitForSeconds(2.0f);
+                yield return new WaitForSeconds(1.5f);
                 AdvanceTurn();
                 yield break;
             }
@@ -445,80 +624,114 @@ public class GameManager : MonoBehaviour
             yield return new WaitForSeconds(0.4f);
             
             GameObject prefabToSpawn = null;
+            GameObject chosenImpactPrefab = null;
             Color projColor = Color.white;
 
             bool structureContientDeLor = card.effects.Exists(e => e.effectType == CardData.EffectType.Gold);
+            bool structureContientDuSoin = card.effects.Exists(e => e.effectType == CardData.EffectType.Heal);
 
+            // 1. CAS DU VOL D'OR
             if (structureContientDeLor || 
                 card.cardName.ToLower().Contains("steal") || 
                 card.cardName.ToLower().Contains("or") || 
+                card.cardName.ToLower().Contains("gold") || 
                 card.cardName.ToLower().Contains("money"))
             {
                 prefabToSpawn = stealProjectilePrefab;
-                projColor = new Color(1f, 0.85f, 0f);
+                chosenImpactPrefab = stealImpactPrefab;
+                projColor = new Color(1f, 0.85f, 0f); // Or
             }
+            // 2. CAS DU SOIN
+            else if (structureContientDuSoin || 
+                     card.cardName.ToLower().Contains("heal") || 
+                     card.cardName.ToLower().Contains("health") || 
+                     card.cardName.ToLower().Contains("hp") ||
+                     card.cardName.ToLower().Contains("revive"))
+            {
+                prefabToSpawn = healProjectilePrefab;
+                chosenImpactPrefab = healImpactPrefab;
+                projColor = new Color(0.2f, 1f, 0.2f); // Vert soin éclatant
+            }
+            // 3. CAS DES DEGATS CLASSIQUES / EFFETS
             else if (card.type == CardData.CardType.Action || card.type == CardData.CardType.Special)
             {
                 prefabToSpawn = attackProjectilePrefab;
+                chosenImpactPrefab = damageImpactPrefab;
 
                 if (card.effects.Count > 0)
                 {
                     CardData.EffectType currentEffect = card.effects[0].effectType;
                     switch (currentEffect)
                     {
-                        case CardData.EffectType.Burn: projColor = new Color(1f, 0.3f, 0f); break;   // Orange
-                        case CardData.EffectType.Poison: projColor = new Color(0.2f, 1f, 0.2f); break; // Vert
-                        case CardData.EffectType.Frozen: projColor = new Color(0f, 0.7f, 1f); break;  // Bleu
-                        default: projColor = new Color(0.9f, 0.1f, 0.1f); break;                      // Rouge
+                        case CardData.EffectType.Burn: projColor = new Color(1f, 0.3f, 0f); break;   
+                        case CardData.EffectType.Poison: projColor = new Color(0.2f, 1f, 0.2f); break; 
+                        case CardData.EffectType.Frozen: projColor = new Color(0f, 0.7f, 1f); break;  
+                        default: projColor = new Color(0.9f, 0.1f, 0.1f); break;                      
                     }
                 }
             }
 
             // === SYSTÈME DE TIR 3D VERROUILLÉ (MODIFIÉ ICI) ===
-            if (prefabToSpawn != null)
+           if (prefabToSpawn != null)
             {
                 Vector3 spawnPos = performer.transform.position;
                 Vector3 targetPos = target.transform.position;
 
-                // On détecte le centre réel du modèle 3D visible (fiole/corps)
                 Renderer perfRenderer = performer.GetComponentInChildren<Renderer>();
                 if (perfRenderer != null) spawnPos = perfRenderer.bounds.center;
 
                 Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
                 if (targetRenderer != null) targetPos = targetRenderer.bounds.center;
 
-                // On instancie notre magnifique projectile 3D
                 GameObject projGO = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
                 
-                // AJOUT : On va chercher le script déjà présent sur le prefab pour garder ton Rotation Offset !
                 GhostProjectile projectileScript = projGO.GetComponent<GhostProjectile>();
-                if (projectileScript == null)
-                {
-                    projectileScript = projGO.AddComponent<GhostProjectile>();
-                }
+                if (projectileScript == null) projectileScript = projGO.AddComponent<GhostProjectile>();
                 
-                // On l'initialise avec la vraie position du corps adverse
                 projectileScript.Setup(targetPos, projColor);
             }
 
             // On attend que le projectile termine sa course
             yield return new WaitForSeconds(0.6f);
 
-            yield return StartCoroutine(PlayImpactJuice(target));
+            // 1. === ANTICIPATION DE LA MORT ===
+            bool isFatalBlow = false;
+            var dmgEffect = card.effects.Find(e => e.effectType == CardData.EffectType.Damage);
+            
+            // Si la carte fait des dégâts et que la loi de soin global n'est pas active
+            if (dmgEffect != null && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
+            {
+                // Si le bot n'a pas de bouclier pour le sauver
+                if (!target.isShielded)
+                {
+                    int dmgAmount = Mathf.Abs((int)dmgEffect.value);
+                    // On applique le multiplicateur de défense du bot
+                    int finalDmg = Mathf.RoundToInt(dmgAmount * target.defenseMultiplier);
+                    
+                    if (target.currentHealth - finalDmg <= 0)
+                    {
+                        isFatalBlow = true; // C'est le coup de grâce !
+                    }
+                }
+            }
 
-            // === NOUVEAU : DÉCLENCHEMENT DE L'ANIMATION D'IMPACT ===
-            StartCoroutine(PlayImpactJuice(target));
+            // 2. === DÉCLENCHEMENT SIMULTANÉ DE L'ANIMATION ET DES PARTICULES ===
+            // On lance la secousse visuelle en arrière-plan
+            StartCoroutine(PlayImpactJuice(target, projColor));
 
-            if (impactParticlePrefab != null)
+            // On fait apparaître l'impact de particules au même instant (si le coup n'est pas fatal)
+            if (chosenImpactPrefab != null && !isFatalBlow)
             {
                 Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
                 Vector3 impactPos = targetRenderer != null ? targetRenderer.bounds.center : target.transform.position;
                 
-                GameObject effectInstance = Instantiate(impactParticlePrefab, impactPos, Quaternion.identity);
-                
-                Destroy(effectInstance, 2.0f);
+                GameObject effectInstance = Instantiate(chosenImpactPrefab, impactPos, Quaternion.identity);
+                Destroy(effectInstance, 2.0f); 
             }
-        } 
+
+            // 3. TIMING : On attend la fin de la secousse avant d'appliquer les dégâts réels
+            yield return new WaitForSeconds(0.25f);
+        }
 
         // --- 3. SÉQUENCE IMPACT : On applique les effets REELS dans le jeu ---
         if (card.cardName == "Glitch" && Object.FindFirstObjectByType<HandManager>() != null)
@@ -530,11 +743,11 @@ public class GameManager : MonoBehaviour
         {
             if (card.targetMode == CardData.TargetMode.Everyone)
             {
-                foreach (PlayerEntity p in turnOrder) ResolveEffect(effect, p, performer);
+                foreach (PlayerEntity p in turnOrder) ResolveEffect(effect, p, performer, card);
             }
             else
             {
-                ResolveEffect(effect, target, performer);
+                ResolveEffect(effect, target, performer, card);
             }
         }
 
@@ -548,7 +761,9 @@ public class GameManager : MonoBehaviour
                     ruleName = card.cardName,
                     ruleDescription = card.description,
                     effectType = effect.effectType,
-                    value = effect.value
+                    value = effect.value,
+
+                    turnsRemaining = 2
                 };
                 activeRules.Add(newRule);
             }
@@ -565,12 +780,31 @@ public class GameManager : MonoBehaviour
         // On laisse 1 seconde de pause pour que le joueur voie bien le résultat des dégâts sur les fioles
         yield return new WaitForSeconds(1.0f);
 
+        if (!card.effects.Exists(e => e.effectType == CardData.EffectType.Mimic))
+        {
+            lastPlayedCard = card;
+        }
+
         // On passe enfin au tour suivant
         AdvanceTurn();
     }
 
     void AdvanceTurn()
     {
+        // === GESTION DE LA DURÉE DES RÈGLES SÉCURISÉE ===
+        for (int i = activeRules.Count - 1; i >= 0; i--)
+        {
+            activeRules[i].turnsRemaining--;
+
+            if (activeRules[i].turnsRemaining <= 0)
+            {
+                Debug.Log($"<color=orange>[Loi expirée]</color> {activeRules[i].ruleName} s'arrête !");
+                activeRules.RemoveAt(i);
+            }
+        }
+        // On actualise ton interface pour faire disparaître l'icône de la règle
+        UpdateActiveRulesUI();
+
         currentTurnIndex++;
         StartNextPlayerTurn();
     }
@@ -588,7 +822,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void ResolveEffect(CardData.CardEffect effect, PlayerEntity target, PlayerEntity performer)
+    void ResolveEffect(CardData.CardEffect effect, PlayerEntity target, PlayerEntity performer, CardData card)
     {
         if (target == null || performer == null) return;
 
@@ -596,6 +830,37 @@ public class GameManager : MonoBehaviour
         {
             case CardData.EffectType.Damage:
                 int dmg = Mathf.Abs((int)effect.value);
+
+                // === 🛡️ SEURITÉ BOUCLIER MIROIR (AJOUTÉE ICI) ===
+                // Si la cible est protégée et qu'un soin global ne change pas les dégâts en vie
+                if (target.isMirrorShielded && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
+                {
+                    target.isMirrorShielded = false; // On détruit le bouclier
+                    Debug.Log($"<color=cyan>[MIROIR]</color> {target.playerName} renvoie les dégâts à {performer.playerName} !");
+                    
+                    // C'est l'attaquant (performer) qui prend les dégâts à la place !
+                    performer.TakeDamage(-dmg);
+                    UpdatePlayerVisualDarkness(performer);
+
+                    // Si l'attaquant se tue lui-même avec son propre reflet
+                    if (performer.isDead)
+                    {
+                        if (deathParticlePrefab != null)
+                        {
+                            Renderer perfRenderer = performer.GetComponentInChildren<Renderer>();
+                            Vector3 deathPos = perfRenderer != null ? perfRenderer.bounds.center : performer.transform.position;
+                            GameObject deathFX = Instantiate(deathParticlePrefab, deathPos, Quaternion.identity);
+                            Destroy(deathFX, 3.0f);
+                        }
+                        if (performer.GetComponentInChildren<Renderer>() != null)
+                        {
+                            performer.GetComponentInChildren<Renderer>().gameObject.SetActive(false);
+                        }
+                    }
+                    break; // TRÈS IMPORTANT : On arrête le code ici. La cible originale ne subit rien !
+                }
+
+                // === TON CODE D'ORIGINE (S'exécute si pas de bouclier miroir) ===
                 if (activeRules.Exists(r => r.effectType == CardData.EffectType.Heal)) target.TakeDamage(dmg);
                 else target.TakeDamage(-dmg);
                 
@@ -621,8 +886,48 @@ public class GameManager : MonoBehaviour
                 }
                 break;
             case CardData.EffectType.Heal: 
-                target.TakeDamage(Mathf.Abs((int)effect.value)); 
-                UpdatePlayerVisualDarkness(target);
+                // Un soin classique ne touche plus aux morts !
+                if (!target.isDead)
+                {
+                    target.TakeDamage(Mathf.Abs((int)effect.value)); 
+                    UpdatePlayerVisualDarkness(target);
+                }
+                break;
+
+            case CardData.EffectType.Revive:
+                // === EFFET REVIVE OFFICIEL ===
+                if (target.isDead)
+                {
+                    target.isDead = false;
+                    
+                    // On réactive son modèle 3D sur la table
+                    Renderer targetRenderer = target.GetComponentInChildren<Renderer>(true);
+                    if (targetRenderer != null) targetRenderer.gameObject.SetActive(true);
+
+                    // On lui redonne de la vie par rapport à la "Value" entrée sur ta carte
+                    target.currentHealth = Mathf.Abs((int)effect.value);
+                    if (target.myHealthLiquidImage != null) target.myHealthLiquidImage.fillAmount = (float)target.currentHealth / target.maxHealth;
+
+                    UpdatePlayerVisualDarkness(target);
+                    Debug.Log($"<color=green>[REVIVE]</color> {target.playerName} ressuscite avec {target.currentHealth} PV !");
+                }
+                break;
+
+            case CardData.EffectType.Mimic:
+                // === EFFET MIMIC OFFICIEL ===
+                if (lastPlayedCard != null)
+                {
+                    Debug.Log($"<color=purple>[MIMIC]</color> Copie de la carte : {lastPlayedCard.cardName}");
+                    // Le Mimic exécute immédiatement tous les effets de la dernière carte sur la cible actuelle !
+                    foreach (var subEffect in lastPlayedCard.effects)
+                    {
+                        ResolveEffect(subEffect, target, performer, lastPlayedCard);
+                    }
+                }
+                else
+                {
+                    Debug.Log("[MIMIC] Aucune carte n'a été jouée ce tour-ci, le sort échoue.");
+                }
                 break;
             case CardData.EffectType.Gold: 
                 int goldAmount = Mathf.Abs((int)effect.value);
@@ -768,7 +1073,8 @@ public class GameManager : MonoBehaviour
     public GameObject impactParticlePrefab;
 
    // === JUICE EFFECT CORRIGÉ (CORPS + YEUX FLASHENT EN ENTIER) ===
-    System.Collections.IEnumerator PlayImpactJuice(PlayerEntity target)
+    // === JUICE EFFECT MIS À JOUR (COULEUR DYNAMIQUE SELON L'ACTION) ===
+    System.Collections.IEnumerator PlayImpactJuice(PlayerEntity target, Color flashColor)
     {
         if (target == null) yield break;
 
@@ -778,7 +1084,7 @@ public class GameManager : MonoBehaviour
 
         Renderer[] allRenderers = target.GetComponentsInChildren<Renderer>();
 
-        // 1. FLASH ROUGE SUR TOUS LES MORCEAUX (Corps + Yeux !)
+        // 1. FLASH DE COULEUR PERSONNALISÉ (Rouge, Jaune, Vert...) sur tous les morceaux
         if (allRenderers != null)
         {
             foreach (Renderer ren in allRenderers)
@@ -791,12 +1097,13 @@ public class GameManager : MonoBehaviour
 
                 if (!string.IsNullOrEmpty(colorPropName))
                 {
-                    ren.material.SetColor(colorPropName, new Color(1f, 0.25f, 0.25f)); 
+                    // On applique la couleur reçue en paramètre à la place du rouge fixe !
+                    ren.material.SetColor(colorPropName, flashColor); 
                 }
             }
         }
 
-        // 2. BOUCLE DE REBOND PHYSICS
+        // 2. BOUCLE DE REBOND PHYSICS (0.25 seconde)
         float duration = 0.25f;
         float time = 0f;
         while (time < duration)
@@ -883,5 +1190,50 @@ public class GameManager : MonoBehaviour
 
         // Si vraiment TOUS les bots sont morts, on renvoie la cible d'origine par sécurité
         return deadTarget;
+    }
+
+    // === ANIMATION RAPIDE ET SOFT "YOUR TURN" (1 SECONDE PILE) ===
+    System.Collections.IEnumerator PlayYourTurnVisualRoutine()
+    {
+        if (resolutionPanel != null) resolutionPanel.SetActive(true);
+        isResolutionPhase = true;
+        if (playerHandUI != null) playerHandUI.SetActive(false); 
+
+        if (resultsText != null)
+        {
+            resultsText.text = "YOUR TURN";
+            RectTransform textRect = resultsText.rectTransform;
+
+            // EFFET SOFT : Le texte commence légèrement plus petit (70%) et va glisser doucement vers 100%
+            textRect.localScale = new Vector3(0.7f, 0.7f, 1f);
+            
+            float duration = 1.0f; // Durée totale divisée par deux !
+            float time = 0f;
+            while (time < duration)
+            {
+                time += Time.deltaTime;
+                float t = time / duration;
+
+                // Durant les premiers 20% du temps (0.2s), on applique une transition fluide (Smooth)
+                if (t < 0.2f)
+                {
+                    float scaleT = t / 0.2f;
+                    textRect.localScale = Vector3.Lerp(new Vector3(0.7f, 0.7f, 1f), Vector3.one, Mathf.Sin(scaleT * Mathf.PI * 0.5f));
+                }
+                else
+                {
+                    textRect.localScale = Vector3.one;
+                }
+                yield return null;
+            }
+            textRect.localScale = Vector3.one;
+        }
+        else
+        {
+            yield return new WaitForSeconds(1.0f);
+        }
+
+        // On lance la main du joueur
+        InitializeHumanTurnVisuals();
     }
 }

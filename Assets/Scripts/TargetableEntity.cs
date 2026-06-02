@@ -6,25 +6,32 @@ public class TargetableEntity : MonoBehaviour
 
     void Start()
     {
-        if (associatedEntity == null)
-        {
-            associatedEntity = GetComponent<PlayerEntity>();
-        }
+        if (associatedEntity == null) associatedEntity = GetComponent<PlayerEntity>();
     }
 
     void OnMouseDown()
     {
-        // SECURITÉ ANTI-CADAVRE : Si le bot est mort, on refuse de le cibler !
-        if (associatedEntity != null && associatedEntity.isDead) return;
-
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
-        
-        if (gm != null && gm.selectedCard != null)
+        if (gm == null || gm.selectedCard == null) return;
+
+        // Détection intelligente : la carte est-elle une résurrection ?
+        bool isReviveCard = gm.selectedCard.cardName.ToLower().Contains("revive") || 
+                            gm.selectedCard.description.ToLower().Contains("revive");
+
+        if (isReviveCard)
         {
-            if (gm.selectedCard.targetMode == CardData.TargetMode.Chosen)
-            {
-                gm.SetSelectedTarget(associatedEntity);
-            }
+            // Sécurité carte Revive : Interdit de cliquer sur un joueur vivant !
+            if (associatedEntity == null || !associatedEntity.isDead) return;
+        }
+        else
+        {
+            // Sécurité carte Normale : Interdit de cliquer sur un fantôme mort !
+            if (associatedEntity != null && associatedEntity.isDead) return;
+        }
+
+        if (gm.selectedCard.targetMode == CardData.TargetMode.Chosen)
+        {
+            gm.SetSelectedTarget(associatedEntity);
         }
     }
 }

@@ -16,7 +16,8 @@ MonoBehaviour:
   description: Protects you from the next incoming attack.
   type: 0
   cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
-  duration: 1
-  effectValue: 0
+  effects:
+  - effectType: 8
+    value: 0
   requiresTarget: 0
   targetMode: 5

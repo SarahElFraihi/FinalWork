@@ -20,7 +20,10 @@ public class CardData : ScriptableObject
         Shield, Invisible, Silenced, Wanted, Linked, // Bools
         Thorns, HandSize, TimerMod, // Modificateurs
         StealCard, Duplicate, // Actions complexes
-        GravityFlip // Règle spéciale
+        GravityFlip, // Règle spéciale
+        Revive,
+        Mimic,
+        MirrorShield
     }
     
     [System.Serializable]

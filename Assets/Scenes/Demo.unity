@@ -1913,7 +1913,7 @@ GameObject:
   - component: {fileID: 310591290}
   - component: {fileID: 310591289}
   m_Layer: 0
-  m_Name: Bot_Eye1
+  m_Name: Eye1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1948,7 +1948,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73f66907b6f42454199a0c4ea1bde4be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerName: Bot_Eye1
+  playerName: Eye1
   isBot: 1
   maxHealth: 100
   currentHealth: 100
@@ -2766,8 +2766,9 @@ MonoBehaviour:
       m_Calls: []
   m_text: YOUR TURN
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 30a681ce8dd8e1c43bd6668ffc9fcd64, type: 2}
+  m_sharedMaterial: {fileID: -4144657049144177182, guid: 30a681ce8dd8e1c43bd6668ffc9fcd64,
+    type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -2791,8 +2792,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 150
-  m_fontSizeBase: 150
+  m_fontSize: 230
+  m_fontSizeBase: 230
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -3810,7 +3811,7 @@ GameObject:
   - component: {fileID: 730438042}
   - component: {fileID: 730438041}
   m_Layer: 0
-  m_Name: Bot_Eye2
+  m_Name: Eye2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3845,7 +3846,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73f66907b6f42454199a0c4ea1bde4be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerName: Bot_Eye2
+  playerName: Eye2
   isBot: 1
   maxHealth: 100
   currentHealth: 100
@@ -4380,7 +4381,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
+  m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &832928705
@@ -4632,8 +4633,9 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 30a681ce8dd8e1c43bd6668ffc9fcd64, type: 2}
+  m_sharedMaterial: {fileID: -4144657049144177182, guid: 30a681ce8dd8e1c43bd6668ffc9fcd64,
+    type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4698,7 +4700,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
+  m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &892524913
@@ -8242,7 +8244,15 @@ MonoBehaviour:
     type: 3}
   stealProjectilePrefab: {fileID: 6099487447474735784, guid: 7b99c871a905b6041b44953df8aecefd,
     type: 3}
+  healProjectilePrefab: {fileID: 6099487447474735784, guid: 3de37e6d2e898154096e5c6553fe5310,
+    type: 3}
   deathParticlePrefab: {fileID: 2433282508537954060, guid: 3ef3ae421f71c5c4e97fe12dc2fc6312,
+    type: 3}
+  damageImpactPrefab: {fileID: 2708598583397607911, guid: 6398d43fe79ea0140913dc5530c646af,
+    type: 3}
+  stealImpactPrefab: {fileID: 5880797563127281583, guid: 265d3a5ba69981a4698ceabcedf368b0,
+    type: 3}
+  healImpactPrefab: {fileID: 8771972552311404799, guid: bbf9e36a48d6c5648a13889afab076fd,
     type: 3}
   isResolutionPhase: 0
   impactParticlePrefab: {fileID: 2708598583397607911, guid: 6398d43fe79ea0140913dc5530c646af,
@@ -8519,7 +8529,7 @@ GameObject:
   - component: {fileID: 1770890862}
   - component: {fileID: 1770890861}
   m_Layer: 0
-  m_Name: Bot_Ghost0
+  m_Name: Ghost0
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8554,7 +8564,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73f66907b6f42454199a0c4ea1bde4be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerName: Bot_Ghost0
+  playerName: Ghost0
   isBot: 1
   maxHealth: 100
   currentHealth: 100

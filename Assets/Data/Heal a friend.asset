@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c9de226cc0366934986b780848165adc, type: 3}
-  m_Name: Mimic
+  m_Name: Heal a friend
   m_EditorClassIdentifier: 
-  cardName: Mimic
-  description: Copy the effect of the last card played this round.
-  type: 2
-  cardColor: {r: 0.6, g: 0.1, b: 0.9, a: 1}
+  cardName: Heal a friend
+  description: Heal someone for 15hp, be kind today.
+  type: 0
+  cardColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
   effects:
-  - effectType: 20
-    value: 0
-  requiresTarget: 0
-  targetMode: 0
+  - effectType: 1
+    value: 15
+  requiresTarget: 1
+  targetMode: 1
