@@ -3255,7 +3255,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   allCardsInGame:
-  - {fileID: 11400000, guid: c43f5597db1f4c243bd734c8f3041757, type: 2}
+  - {fileID: 11400000, guid: de00d55a4c0242c41a09d3ba503fd8a2, type: 2}
   - {fileID: 11400000, guid: 9f58ecc1fb9d43343ba0e183945d0a26, type: 2}
   - {fileID: 11400000, guid: 65eb008fc9e11d44287fae31c5f7d4f8, type: 2}
   - {fileID: 11400000, guid: b9563d4875e31a64397609535cded50d, type: 2}
@@ -3263,7 +3263,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 67ab5a50b9ef7064c90718fb3dab37e8, type: 2}
   - {fileID: 11400000, guid: 1382f93681d8c384287b63180d06b662, type: 2}
   - {fileID: 11400000, guid: d41c2be9e7011c348a8c5220f76c0fc5, type: 2}
-  - {fileID: 11400000, guid: 630a177c78330df4998aec10ddb78d23, type: 2}
+  - {fileID: 11400000, guid: 3ff8c602ffe335a4b95ca0712e1423e2, type: 2}
   - {fileID: 11400000, guid: e56ba8f1d54026f45b5e188faa257222, type: 2}
   - {fileID: 11400000, guid: 0726850b78173964d83a78ec0548354e, type: 2}
   - {fileID: 11400000, guid: a31852193565d334b8a629dfb07f61f3, type: 2}
@@ -8194,7 +8194,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1718063284}
   - component: {fileID: 1718063283}
-  - component: {fileID: 1718063285}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -8272,19 +8271,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 879031026}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1718063285
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1718063282}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8471e1738784d734eb5a04cfacdf9371, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxPoolSize: 25
 --- !u!1 &1718202216
 GameObject:
   m_ObjectHideFlags: 0

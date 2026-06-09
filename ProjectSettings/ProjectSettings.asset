@@ -163,7 +163,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Standalone: com.Unity.3D-Stealth
+    Standalone: com.DefaultCompany.FinalWork
   buildNumber:
     Standalone: 0
     VisionOS: 0

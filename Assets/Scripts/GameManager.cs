@@ -785,7 +785,7 @@ public class GameManager : MonoBehaviour
             lastPlayedCard = card;
         }
 
-        // On passe enfin au tour suivant
+    if (CheckWinCondition()) yield break; 
         AdvanceTurn();
     }
 
@@ -965,6 +965,25 @@ public class GameManager : MonoBehaviour
 
     public bool CheckWinCondition()
     {
+        // 1. CAS OÙ LE JOUEUR EST MORT : Écran de défaite immédiat !
+        if (playerEntity != null && playerEntity.isDead)
+        {
+            // === NIEUW: We verbergen de grote kaart zodat de tekst zichtbaar is! ===
+            if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
+
+            timerRunning = false;
+            UpdateTimerUI();
+            if (resolutionPanel != null) resolutionPanel.SetActive(true);
+            isResolutionPhase = true;
+            
+            if (resultsText != null) 
+                resultsText.text = "<size=100><b>YOU ARE DEAD!</b></size>\n\n<size=50>De bots hebben gewonnen...</size>";
+            
+            StartCoroutine(ReturnToMainMenuRoutine());
+            return true;
+        }
+
+        // 2. CAS CLASSIQUE : On compte les survivants sur la table
         List<PlayerEntity> survivors = new List<PlayerEntity>();
         if (playerEntity != null && !playerEntity.isDead) survivors.Add(playerEntity);
         foreach (PlayerEntity bot in botEntities)
@@ -974,6 +993,9 @@ public class GameManager : MonoBehaviour
 
         if (survivors.Count <= 1)
         {
+            // === NIEUW: We verbergen de grote kaart ook bij een overwinning! ===
+            if (centerCardDisplay != null) centerCardDisplay.gameObject.SetActive(false);
+
             timerRunning = false;
             UpdateTimerUI();
             if (resolutionPanel != null) resolutionPanel.SetActive(true);
@@ -981,15 +1003,25 @@ public class GameManager : MonoBehaviour
             
             if (survivors.Count == 1)
             {
-                if (resultsText != null) resultsText.text = "<size=100><b>VICTORY!</b></size>\n\n<size=50>" + survivors[0].playerName + " survit!</size>";
+                if (resultsText != null) 
+                    resultsText.text = "<size=100><b>VICTORY!</b></size>\n\n<size=50>" + survivors[0].playerName + " survit!</size>";
             }
             else
             {
-                if (resultsText != null) resultsText.text = "<size=100><b>DRAW!</b></size>\n\n<size=50>Plus personne n'est en vie!</size>";
+                if (resultsText != null) 
+                    resultsText.text = "<size=100><b>DRAW!</b></size>\n\n<size=50>Plus personne n'est en vie!</size>";
             }
+
+            StartCoroutine(ReturnToMainMenuRoutine());
             return true;
         }
         return false;
+    }
+
+    System.Collections.IEnumerator ReturnToMainMenuRoutine()
+    {
+        yield return new WaitForSeconds(4.0f);
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu"); 
     }
 
     public void UpdateGoldUI()

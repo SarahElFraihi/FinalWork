@@ -14,6 +14,19 @@ public class AICardGenerator : MonoBehaviour
     public Queue<CardData> aiCardPool = new Queue<CardData>();
     private bool isFilling = false;
 
+   private static AICardGenerator instance;
+
+    void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
     void Start()
     {
         FillPool();
