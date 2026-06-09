@@ -134,10 +134,10 @@ public class AICardGenerator : MonoBehaviour
             {
                 forcedTypes[i] = 0;
                 forcedTargets[i] = 1;
-                forcedValues[i] = 15f;
-                if (eff == 0) instructions[i] = "a spooky offensive attack dealing 15 damage";
-                else if (eff == 1) instructions[i] = "ghostly healing or restoration of 15 health points";
-                else if (eff == 2) instructions[i] = "stealing 15 gold from the target opponent";
+                forcedValues[i] = 35f;
+                if (eff == 0) instructions[i] = "a spooky offensive attack dealing 35 damage";
+                else if (eff == 1) instructions[i] = "ghostly healing or restoration of 25 health points";
+                else if (eff == 2) instructions[i] = "stealing 10 gold from the target opponent";
             }
         }
 
