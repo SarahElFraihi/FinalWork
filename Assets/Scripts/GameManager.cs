@@ -26,6 +26,13 @@ public class GameManager : MonoBehaviour
     public CardDisplay centerCardDisplay;
     public Transform centerTableViewPoint;
 
+    [Header("Audio Settings")]
+    public AudioSource audioSource;
+    public AudioClip attackSound;
+    public AudioClip stealSound;
+    public AudioClip healSound;
+    public AudioClip deathSound;  
+
     [Header("Timer Juice Settings")]
     private int lastSecondTicked = -1;
     private float timerPulseScale = 0f;
@@ -602,7 +609,7 @@ public class GameManager : MonoBehaviour
         // [CHRONO LECTURE] On attend sagement 3 secondes que le joueur lise la carte au calme
         yield return new WaitForSeconds(3.0f);
 
-        // --- 2. SÉQUENCE ACTION : On masque la carte et on lance l'attaque visuelle ---
+       // --- 2. SÉQUENCE ACTION : On masse la carte et on lance l'attaque visuelle ---
         if (target != null && target != performer)
         {
             // === NOUVEAU : REDIRECTION AUTOMATIQUE SI LA CIBLE EST MORTE ===
@@ -622,6 +629,24 @@ public class GameManager : MonoBehaviour
             }
 
             yield return new WaitForSeconds(0.4f);
+
+            // === 1. ANTICIPATION DE LA MORT (DÉPLACÉE ICI) ===
+            bool isFatalBlow = false;
+            var dmgEffect = card.effects.Find(e => e.effectType == CardData.EffectType.Damage);
+            
+            if (dmgEffect != null && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
+            {
+                if (!target.isShielded)
+                {
+                    int dmgAmount = Mathf.Abs((int)dmgEffect.value);
+                    int finalDmg = Mathf.RoundToInt(dmgAmount * target.defenseMultiplier);
+                    
+                    if (target.currentHealth - finalDmg <= 0)
+                    {
+                        isFatalBlow = true; // C'est le coup de grâce !
+                    }
+                }
+            }
             
             GameObject prefabToSpawn = null;
             GameObject chosenImpactPrefab = null;
@@ -630,7 +655,7 @@ public class GameManager : MonoBehaviour
             bool structureContientDeLor = card.effects.Exists(e => e.effectType == CardData.EffectType.Gold);
             bool structureContientDuSoin = card.effects.Exists(e => e.effectType == CardData.EffectType.Heal);
 
-            // 1. CAS DU VOL D'OR
+            // A. CAS DU VOL D'OR
             if (structureContientDeLor || 
                 card.cardName.ToLower().Contains("steal") || 
                 card.cardName.ToLower().Contains("or") || 
@@ -639,9 +664,10 @@ public class GameManager : MonoBehaviour
             {
                 prefabToSpawn = stealProjectilePrefab;
                 chosenImpactPrefab = stealImpactPrefab;
-                projColor = new Color(1f, 0.85f, 0f); // Or
+                audioSource.PlayOneShot(stealSound);
+                projColor = new Color(1f, 0.85f, 0f);
             }
-            // 2. CAS DU SOIN
+            // B. CAS DU SOIN
             else if (structureContientDuSoin || 
                      card.cardName.ToLower().Contains("heal") || 
                      card.cardName.ToLower().Contains("health") || 
@@ -650,13 +676,20 @@ public class GameManager : MonoBehaviour
             {
                 prefabToSpawn = healProjectilePrefab;
                 chosenImpactPrefab = healImpactPrefab;
-                projColor = new Color(0.2f, 1f, 0.2f); // Vert soin éclatant
+                audioSource.PlayOneShot(healSound);
+                projColor = new Color(0.2f, 1f, 0.2f);
             }
-            // 3. CAS DES DEGATS CLASSIQUES / EFFETS
+            // C. CAS DES DEGATS CLASSIQUES
             else if (card.type == CardData.CardType.Action || card.type == CardData.CardType.Special)
             {
                 prefabToSpawn = attackProjectilePrefab;
                 chosenImpactPrefab = damageImpactPrefab;
+
+                // === CORRECTION AUDIO : On ne joue l'attaque QUE si ce n'est pas fatal ===
+                if (audioSource != null && !isFatalBlow)
+                {
+                    audioSource.PlayOneShot(attackSound);
+                }
 
                 if (card.effects.Count > 0)
                 {
@@ -671,8 +704,8 @@ public class GameManager : MonoBehaviour
                 }
             }
 
-            // === SYSTÈME DE TIR 3D VERROUILLÉ (MODIFIÉ ICI) ===
-           if (prefabToSpawn != null)
+            // === SYSTÈME DE TIR 3D VERROUILLÉ ===
+            if (prefabToSpawn != null)
             {
                 Vector3 spawnPos = performer.transform.position;
                 Vector3 targetPos = target.transform.position;
@@ -684,42 +717,19 @@ public class GameManager : MonoBehaviour
                 if (targetRenderer != null) targetPos = targetRenderer.bounds.center;
 
                 GameObject projGO = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
-                
                 GhostProjectile projectileScript = projGO.GetComponent<GhostProjectile>();
                 if (projectileScript == null) projectileScript = projGO.AddComponent<GhostProjectile>();
-                
                 projectileScript.Setup(targetPos, projColor);
             }
 
             // On attend que le projectile termine sa course
             yield return new WaitForSeconds(0.6f);
 
-            // 1. === ANTICIPATION DE LA MORT ===
-            bool isFatalBlow = false;
-            var dmgEffect = card.effects.Find(e => e.effectType == CardData.EffectType.Damage);
-            
-            // Si la carte fait des dégâts et que la loi de soin global n'est pas active
-            if (dmgEffect != null && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
-            {
-                // Si le bot n'a pas de bouclier pour le sauver
-                if (!target.isShielded)
-                {
-                    int dmgAmount = Mathf.Abs((int)dmgEffect.value);
-                    // On applique le multiplicateur de défense du bot
-                    int finalDmg = Mathf.RoundToInt(dmgAmount * target.defenseMultiplier);
-                    
-                    if (target.currentHealth - finalDmg <= 0)
-                    {
-                        isFatalBlow = true; // C'est le coup de grâce !
-                    }
-                }
-            }
+            // (L'ancien bloc d'anticipation de la mort qui était ici a été supprimé)
 
             // 2. === DÉCLENCHEMENT SIMULTANÉ DE L'ANIMATION ET DES PARTICULES ===
-            // On lance la secousse visuelle en arrière-plan
             StartCoroutine(PlayImpactJuice(target, projColor));
 
-            // On fait apparaître l'impact de particules au même instant (si le coup n'est pas fatal)
             if (chosenImpactPrefab != null && !isFatalBlow)
             {
                 Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
@@ -729,7 +739,6 @@ public class GameManager : MonoBehaviour
                 Destroy(effectInstance, 2.0f); 
             }
 
-            // 3. TIMING : On attend la fin de la secousse avant d'appliquer les dégâts réels
             yield return new WaitForSeconds(0.25f);
         }
 
@@ -831,20 +840,18 @@ public class GameManager : MonoBehaviour
             case CardData.EffectType.Damage:
                 int dmg = Mathf.Abs((int)effect.value);
 
-                // === 🛡️ SEURITÉ BOUCLIER MIROIR (AJOUTÉE ICI) ===
-                // Si la cible est protégée et qu'un soin global ne change pas les dégâts en vie
+                // A. CAS DU BOUCLIER MIROIR
                 if (target.isMirrorShielded && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
                 {
-                    target.isMirrorShielded = false; // On détruit le bouclier
-                    Debug.Log($"<color=cyan>[MIROIR]</color> {target.playerName} renvoie les dégâts à {performer.playerName} !");
-                    
-                    // C'est l'attaquant (performer) qui prend les dégâts à la place !
+                    target.isMirrorShielded = false; 
                     performer.TakeDamage(-dmg);
                     UpdatePlayerVisualDarkness(performer);
 
-                    // Si l'attaquant se tue lui-même avec son propre reflet
                     if (performer.isDead)
                     {
+                        // === JOUE LE SON DE MORT (RETOUR MIROIR) ===
+                        if (audioSource != null) audioSource.PlayOneShot(deathSound);
+
                         if (deathParticlePrefab != null)
                         {
                             Renderer perfRenderer = performer.GetComponentInChildren<Renderer>();
@@ -857,19 +864,20 @@ public class GameManager : MonoBehaviour
                             performer.GetComponentInChildren<Renderer>().gameObject.SetActive(false);
                         }
                     }
-                    break; // TRÈS IMPORTANT : On arrête le code ici. La cible originale ne subit rien !
+                    break; 
                 }
 
-                // === TON CODE D'ORIGINE (S'exécute si pas de bouclier miroir) ===
+                // B. CAS NORMAL
                 if (activeRules.Exists(r => r.effectType == CardData.EffectType.Heal)) target.TakeDamage(dmg);
                 else target.TakeDamage(-dmg);
                 
-                // 1. On applique l'assombrissement progressif
                 UpdatePlayerVisualDarkness(target);
 
-                // 2. === EXPLOSION ===
                 if (target.isDead)
                 {
+                    // === JOUE LE SON DE MORT (ATTAQUE NORMALE OU BOT) ===
+                    if (audioSource != null) audioSource.PlayOneShot(deathSound);
+
                     if (deathParticlePrefab != null)
                     {
                         Renderer targetRenderer = target.GetComponentInChildren<Renderer>();
@@ -885,6 +893,8 @@ public class GameManager : MonoBehaviour
                     }
                 }
                 break;
+
+
             case CardData.EffectType.Heal: 
                 // Un soin classique ne touche plus aux morts !
                 if (!target.isDead)
@@ -1059,6 +1069,8 @@ public class GameManager : MonoBehaviour
                 // Si le poison ou le feu l'a achevé, il explose !
                 if (p.isDead)
                 {
+                    if (audioSource != null) audioSource.PlayOneShot(deathSound);
+
                     if (deathParticlePrefab != null)
                     {
                         Renderer targetRenderer = p.GetComponentInChildren<Renderer>();
