@@ -3339,22 +3339,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   allCardsInGame:
-  - {fileID: 11400000, guid: de00d55a4c0242c41a09d3ba503fd8a2, type: 2}
-  - {fileID: 11400000, guid: 9f58ecc1fb9d43343ba0e183945d0a26, type: 2}
-  - {fileID: 11400000, guid: 65eb008fc9e11d44287fae31c5f7d4f8, type: 2}
+  - {fileID: 11400000, guid: ec68d9659207b5f4cafa1ae49942408e, type: 2}
+  - {fileID: 11400000, guid: 39e0c15c144c2cd4d8844902e6cb1627, type: 2}
+  - {fileID: 11400000, guid: 9e27cf1975177454eb803a730757049d, type: 2}
+  - {fileID: 11400000, guid: b99a5b6d38a0f924bb9121821542ebd7, type: 2}
   - {fileID: 11400000, guid: b9563d4875e31a64397609535cded50d, type: 2}
-  - {fileID: 11400000, guid: 665ec7898c32e124b85533ae5e928a0c, type: 2}
-  - {fileID: 11400000, guid: 67ab5a50b9ef7064c90718fb3dab37e8, type: 2}
-  - {fileID: 11400000, guid: 1382f93681d8c384287b63180d06b662, type: 2}
-  - {fileID: 11400000, guid: d41c2be9e7011c348a8c5220f76c0fc5, type: 2}
-  - {fileID: 11400000, guid: 3ff8c602ffe335a4b95ca0712e1423e2, type: 2}
-  - {fileID: 11400000, guid: e56ba8f1d54026f45b5e188faa257222, type: 2}
-  - {fileID: 11400000, guid: 0726850b78173964d83a78ec0548354e, type: 2}
-  - {fileID: 11400000, guid: a31852193565d334b8a629dfb07f61f3, type: 2}
-  - {fileID: 11400000, guid: 73f16c53d7af23d4885936b1af021ce6, type: 2}
-  - {fileID: 11400000, guid: e81b1fa66294b9e458187e7a734fe060, type: 2}
-  - {fileID: 11400000, guid: 1b8bbcc73bcf1884f814632489cab553, type: 2}
-  - {fileID: 11400000, guid: 9722eb96677221a468bd9f4d58c11765, type: 2}
+  - {fileID: 11400000, guid: d5d26d5b53c78dc4fa9fca81e9db333d, type: 2}
+  - {fileID: 11400000, guid: ccd360b7a3ef3f94eafe362cbc6cbd0b, type: 2}
+  - {fileID: 11400000, guid: 0ee621900aa76ab4c98214d86f8712ad, type: 2}
+  - {fileID: 11400000, guid: 3e02bd59595e16f449d66562fe4563f0, type: 2}
+  - {fileID: 11400000, guid: 77f62f37b720e8947adb74f9e68bc00c, type: 2}
+  - {fileID: 11400000, guid: af5da9c9574fa00459ac3476ed34f097, type: 2}
+  - {fileID: 11400000, guid: b410eb23524b7824c8a15474a8d549bb, type: 2}
+  - {fileID: 11400000, guid: 0eba48a845a7bdc4d9701151787e456a, type: 2}
+  - {fileID: 11400000, guid: 450ceea9da4fa0b409e3a3d423d66f37, type: 2}
+  - {fileID: 11400000, guid: 9608edbe62871024db7e7ee5091641b5, type: 2}
   cardSlots:
   - {fileID: 30031957}
   - {fileID: 1251751919}
