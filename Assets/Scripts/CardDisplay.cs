@@ -48,12 +48,27 @@ public class CardDisplay : MonoBehaviour
     }
 
     public void SetVisualState(bool isDimmed)
+{
+    // 1. On récupère la couleur de base définie dans ton CardData
+    Color targetColor = cardData.cardColor;
+
+    // 2. Si la carte doit être grisée/désélectionnée[cite: 4]
+    if (isDimmed)
     {
-        Color targetColor = isDimmed ? new Color(0.2f, 0.2f, 0.2f, 1f) : cardData.cardColor;
-        colorOutline.color = targetColor;
-        iconDisplay.color = targetColor;
-        nameText.color = targetColor;
+        targetColor.a = 0.25f; // On passe l'alpha à 25% (très transparent)
     }
+    else
+    {
+        targetColor.a = 1f;    // Opacité totale (100%) pour la carte active
+    }
+
+    // 3. On applique la couleur avec le bon niveau de transparence
+    colorOutline.color = targetColor;
+    iconDisplay.color = targetColor;
+    nameText.color = targetColor;
+
+    if (descriptionText != null) descriptionText.color = isDimmed ? new Color(1f, 1f, 1f, 0.25f) : Color.white;
+}
 
     public void SelectThisCard()
     {

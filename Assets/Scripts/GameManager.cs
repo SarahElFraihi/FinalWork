@@ -212,6 +212,22 @@ public class GameManager : MonoBehaviour
 
     void StartNewRound()
     {
+        // === GESTION DE LA DURÉE DES RÈGLES PAR ROUNDS ===
+        for (int i = activeRules.Count - 1; i >= 0; i--)
+        {
+            activeRules[i].turnsRemaining--; // Ici, cela signifie désormais "Rounds restants"
+
+            if (activeRules[i].turnsRemaining <= 0)
+            {
+                Debug.Log($"<color=orange>[Loi expirée]</color> {activeRules[i].ruleName} s'arrête après son cycle !");
+                activeRules.RemoveAt(i);
+            }
+        }
+        // On actualise l'affichage pour nettoyer les icônes des lois mortes
+        UpdateActiveRulesUI();
+
+
+        // (Le reste de ton code d'origine reste inchangé)
         ApplyPassiveRules();
         BuildTurnOrder();
         
@@ -319,12 +335,25 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // === 1. DÉCLENCHEMENT DE L'EXPLOSION DU TIME OUT ===
     // === 1. DÉCLENCHEMENT DU TIME OUT SANS EXPLOSION ===
     void HandleTimeOut()
     {
         PlayerEntity activePlayer = turnOrder[currentTurnIndex];
         if (activePlayer.isBot) return; 
+
+        // 🧹 NETTOYAGE : On force la flèche verte à s'éteindre immédiatement
+        TargetingManager targetMg = Object.FindFirstObjectByType<TargetingManager>();
+        if (targetMg != null)
+        {
+            targetMg.ResetArrow();
+        }
+
+        // 🃏 INTERFACE : On remet les visuels des cartes à plat (plus de cartes grisées)
+        HandManager handMg = Object.FindFirstObjectByType<HandManager>();
+        if (handMg != null)
+        {
+            handMg.ResetAllCardsVisuals();
+        }
 
         // On lance la routine visuelle épurée
         StartCoroutine(TimeOutVisualRoutine());
@@ -772,7 +801,7 @@ public class GameManager : MonoBehaviour
                     effectType = effect.effectType,
                     value = effect.value,
 
-                    turnsRemaining = 2
+                    turnsRemaining = 1
                 };
                 activeRules.Add(newRule);
             }
@@ -800,20 +829,6 @@ public class GameManager : MonoBehaviour
 
     void AdvanceTurn()
     {
-        // === GESTION DE LA DURÉE DES RÈGLES SÉCURISÉE ===
-        for (int i = activeRules.Count - 1; i >= 0; i--)
-        {
-            activeRules[i].turnsRemaining--;
-
-            if (activeRules[i].turnsRemaining <= 0)
-            {
-                Debug.Log($"<color=orange>[Loi expirée]</color> {activeRules[i].ruleName} s'arrête !");
-                activeRules.RemoveAt(i);
-            }
-        }
-        // On actualise ton interface pour faire disparaître l'icône de la règle
-        UpdateActiveRulesUI();
-
         currentTurnIndex++;
         StartNextPlayerTurn();
     }
@@ -840,18 +855,24 @@ public class GameManager : MonoBehaviour
             case CardData.EffectType.Damage:
                 int dmg = Mathf.Abs((int)effect.value);
 
-                // A. CAS DU BOUCLIER MIROIR
+                // === 🛡️ SECURITÉ BOUCLIER MIROIR ===
                 if (target.isMirrorShielded && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
                 {
                     target.isMirrorShielded = false; 
+                    Debug.Log($"<color=cyan>[MIROIR]</color> {target.playerName} renvoie les dégâts à {performer.playerName} !");
+                    
                     performer.TakeDamage(-dmg);
                     UpdatePlayerVisualDarkness(performer);
 
+                    // 💥 SIGNAL 1 : Si le retour de flamme du miroir touche le JOUEUR humain
+                    if (performer == playerEntity)
+                    {
+                        if (MansionEffects.Instance != null) MansionEffects.Instance.TriggerNextMansionStage();
+                    }
+
                     if (performer.isDead)
                     {
-                        // === JOUE LE SON DE MORT (RETOUR MIROIR) ===
                         if (audioSource != null) audioSource.PlayOneShot(deathSound);
-
                         if (deathParticlePrefab != null)
                         {
                             Renderer perfRenderer = performer.GetComponentInChildren<Renderer>();
@@ -867,17 +888,21 @@ public class GameManager : MonoBehaviour
                     break; 
                 }
 
-                // B. CAS NORMAL
+                // === CAS NORMAL ===
                 if (activeRules.Exists(r => r.effectType == CardData.EffectType.Heal)) target.TakeDamage(dmg);
                 else target.TakeDamage(-dmg);
                 
                 UpdatePlayerVisualDarkness(target);
 
+                // 💥 SIGNAL 2 : Si le JOUEUR humain prend un coup normal en plein fouet
+                if (target == playerEntity && !activeRules.Exists(r => r.effectType == CardData.EffectType.Heal))
+                {
+                    if (MansionEffects.Instance != null) MansionEffects.Instance.TriggerNextMansionStage();
+                }
+
                 if (target.isDead)
                 {
-                    // === JOUE LE SON DE MORT (ATTAQUE NORMALE OU BOT) ===
                     if (audioSource != null) audioSource.PlayOneShot(deathSound);
-
                     if (deathParticlePrefab != null)
                     {
                         Renderer targetRenderer = target.GetComponentInChildren<Renderer>();

@@ -21,6 +21,6 @@ MonoBehaviour:
   - effectType: 16
     value: 1
   - effectType: 0
-    value: 50
+    value: 35
   requiresTarget: 1
   targetMode: 1
